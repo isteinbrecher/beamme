@@ -16,7 +16,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wextra -O3")
 
 # Add libraries.
-add_library(meshpy_cpp MODULE src/meshpy_cpp.cpp)
+add_library(meshpy_cpp MODULE src/find_close_nodes.cpp src/meshpy_cpp.cpp)
 
 # Define target.
 set_target_properties(

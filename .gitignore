@@ -1,5 +1,4 @@
 # general filetypes to ignorer
-*.txt
 *.pyc
 
 # test file in root folder
@@ -23,6 +22,9 @@
 meshpy/meshpy
 */find_close_nodes.c
 */find_close_nodes.html
+
+# C++ folders
+/meshpy/cpp/build
 
 # AceGen stuff
 */rotation_matrix.cpp
