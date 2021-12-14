@@ -42,7 +42,7 @@ import warnings
 
 # Meshpy modules.
 from .conf import mpy
-from .meshpy import find_close_points as find_points
+#from .meshpy import find_close_points as find_points
 import meshpy.cpp.build.meshpy_cpp
 
 
@@ -131,12 +131,12 @@ def find_close_points(nodes, binning=mpy.binning, nx=mpy.binning_n_bin,
 
     # Get list of closest pairs.
     if binning:
-        has_partner, n_partner = find_points.find_close_points_binning(nodes,
-            nx, ny, nz, eps)
-        has_partner, n_partner = meshpy.cpp.build.meshpy_cpp.find_close_nodes(coords, eps)
+#        has_partner, n_partner = find_points.find_close_points_binning(nodes,
+#            nx, ny, nz, eps)
+        has_partner, n_partner = meshpy.cpp.build.meshpy_cpp.find_close_nodes(nodes, eps)
     else:
-        has_partner, n_partner = find_points.find_close_points(nodes, eps=eps)
-        has_partner, n_partner = meshpy.cpp.build.meshpy_cpp.find_close_nodes(coords, eps)
+#        has_partner, n_partner = find_points.find_close_points(nodes, eps=eps)
+        has_partner, n_partner = meshpy.cpp.build.meshpy_cpp.find_close_nodes(nodes, eps)
 
     return point_partners_to_partner_indices(has_partner, n_partner)
 
