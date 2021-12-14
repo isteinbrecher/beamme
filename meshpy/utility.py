@@ -1,4 +1,32 @@
 # -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------
+# MeshPy: A beam finite element input generator
+#
+# MIT License
+#
+# Copyright (c) 2021 Ivo Steinbrecher
+#                    Institute for Mathematics and Computer-Based Simulation
+#                    Universitaet der Bundeswehr Muenchen
+#                    https://www.unibw.de/imcs-en
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# -----------------------------------------------------------------------------
 """
 This module implements some basic functions that are used in the meshpy
 application.
@@ -7,12 +35,14 @@ application.
 # Python modules.
 import subprocess
 import os
+import shutil
+from pathlib import Path
 import numpy as np
-import xml.etree.ElementTree as ET
 import warnings
 
 # Meshpy modules.
-from . import mpy, find_close_nodes, find_close_nodes_binning
+from .conf import mpy
+from .meshpy import find_close_points as find_points
 import meshpy.cpp.build.meshpy_cpp
 
 
@@ -46,9 +76,72 @@ def flatten(data):
         return [data]
 
 
-def get_close_nodes(nodes, binning=mpy.binning, nx=mpy.binning_n_bin,
-        ny=mpy.binning_n_bin, nz=mpy.binning_n_bin, eps=mpy.eps_pos,
-        return_nodes=True):
+def point_partners_to_partner_indices(point_partners, n_partners):
+    """
+    Convert the partner indices for each point to a list of lists with the
+    indices for all partners.
+    """
+    partner_indices = [[] for i in range(n_partners)]
+    for i, partner_index in enumerate(point_partners):
+        if partner_index != -1:
+            partner_indices[partner_index].append(i)
+    return partner_indices
+
+
+def partner_indices_to_point_partners(partner_indices, n_points):
+    """
+    Convert the list of lists with the indices for all partners to the partner
+    indices for each point.
+    """
+    point_partners = [-1 for _i in range(n_points)]
+    for i_partner, partners in enumerate(partner_indices):
+        for index in partners:
+            point_partners[index] = i_partner
+    return point_partners, len(partner_indices)
+
+
+def find_close_points(nodes, binning=mpy.binning, nx=mpy.binning_n_bin,
+        ny=mpy.binning_n_bin, nz=mpy.binning_n_bin, eps=mpy.eps_pos):
+    """
+    Find n-dimensional points that are close to each other.
+
+    Args
+    ----
+    nodes: np.array(n_points x n_dim)
+        Point coordinates that are checked for partners.
+    binning: bool
+        If binning should be used. Only the first three dimensions will be used
+        for binning.
+    nx, ny, nz: int
+        Number of bins in the first three dimensions.
+    eps: double
+        Hypersphere radius value that the coordinates have to be within, to be
+        identified as overlapping.
+
+    Return
+    ----
+    partner_indices: list(list(int))
+        A list of lists of point indices that are close to each other.
+    """
+
+    if len(nodes) > mpy.binning_max_nodes_brute_force and not mpy.binning:
+        warnings.warn('The function get_close_points is called directly '
+            + 'with {} points, for performance reasons the '.format(len(nodes))
+            + 'function find_close_points_binning should be used!')
+
+    # Get list of closest pairs.
+    if binning:
+        has_partner, n_partner = find_points.find_close_points_binning(nodes,
+            nx, ny, nz, eps)
+        has_partner, n_partner = meshpy.cpp.build.meshpy_cpp.find_close_nodes(coords, eps)
+    else:
+        has_partner, n_partner = find_points.find_close_points(nodes, eps=eps)
+        has_partner, n_partner = meshpy.cpp.build.meshpy_cpp.find_close_nodes(coords, eps)
+
+    return point_partners_to_partner_indices(has_partner, n_partner)
+
+
+def find_close_nodes(nodes, **kwargs):
     """
     Find nodes that are close to each other.
 
@@ -56,172 +149,88 @@ def get_close_nodes(nodes, binning=mpy.binning, nx=mpy.binning_n_bin,
     ----
     nodes: list(Node)
         Nodes that are checked for partners.
-    binning: bool
-        If binning should be used.
-    nx, ny, nz: int
-        Number of bins in the directions.
-    eps: double
-        Spherical value that the nodes have to be within, to be identified
-        as overlapping.
-    return_nodes: bool
-        If true, the Node objects are returned, otherwise the index of the node
-        objects in the list nodes. This option is mainly used for testing.
+    **kwargs:
+        Arguments passed on to find_close_points
 
     Return
     ----
-    partner_nodes: list(list(Node)), list(int)
-        A list of lists with partner nodes.
+    partner_nodes: list(list(Node))
+        A list of lists of nodes that are close to each other.
     """
 
-    # Get array of coordinates.
     coords = np.zeros([len(nodes), 3])
     for i, node in enumerate(nodes):
         coords[i, :] = node.coordinates
-
-    if len(nodes) > mpy.binning_max_nodes_brute_force and not mpy.binning:
-        warnings.warn('The function get_close_nodes is called directly '
-            + 'with {} nodes, for performance reasons the '.format(len(nodes))
-            + 'function find_close_nodes_binning should be used!')
-
-    # Get list of closest pairs.
-    if mpy.binning:
-#        has_partner, n_partner = find_close_nodes_binning(coords, nx, ny, nz,
-#            eps)
-        has_partner, n_partner = meshpy.cpp.build.meshpy_cpp.find_close_nodes(coords, eps)
-
-    else:
-#        has_partner, n_partner = find_close_nodes(coords, eps=eps)
-        has_partner, n_partner = meshpy.cpp.build.meshpy_cpp.find_close_nodes(coords, eps)
-
-    if return_nodes:
-        # Create list with nodes.
-        partner_nodes = [[] for i in range(n_partner)]
-        for i, node in enumerate(nodes):
-            if not has_partner[i] == -1:
-                partner_nodes[has_partner[i]].append(node)
-
-        return partner_nodes
-    else:
-        # Return the partner list.
-        return has_partner, n_partner
+    partner_indices = find_close_points(coords, **kwargs)
+    return [[nodes[i] for i in partners] for partners in partner_indices]
 
 
-def xml_to_dict(xml, tol_float):
-    """Convert a XML to a nested dictionary."""
-
-    # Get and sort keys.
-    keys = xml.keys()
-    keys.sort()
-
-    # Get string for this XML element.
-    string = '<' + xml.tag
-    if 'Name' in keys:
-        # If there is a key "Name" put this one first.
-        index = keys.index('Name')
-        if index == 0:
-            pass
-        else:
-            keys[0], keys[index] = keys[index], keys[0]
-    for key in keys:
-        string += ' '
-        string += key
-        string += '="'
-        string += xml.get(key)
-        string += '"'
-    string += '>'
-
-    # Get data for this item.
-    xml_dict = {}
-    n_childs = len(xml.getchildren())
-    is_text = not xml.text.strip() == ''
-    if n_childs > 0 and is_text:
-        raise ValueError('The text is not empty and there are children. This '
-            + 'case should not happen!')
-    elif n_childs > 0:
-        # Add a child xml construct.
-        for child in xml.getchildren():
-            key, value = xml_to_dict(child, tol_float)
-            xml_dict[key] = value
-    elif is_text:
-        # Add data.
-        data = xml.text.split('\n')
-        if tol_float is None:
-            data_new = [line.strip() for line in data
-                if not line.strip() == '']
-        else:
-            data_new = []
-            for line in data:
-                if line.strip() == '':
-                    continue
-                for number in line.strip().split(' '):
-                    if np.abs(float(number)) < tol_float:
-                        data_new.append('0.0')
-                    else:
-                        data_new.append(number)
-        data_string = '\n'.join(data_new)
-        xml_dict[''] = data_string
-
-    # Return key for this item and all child items.
-    return string, xml_dict
-
-
-def xml_dict_to_string(item):
-    """The nested XML dictionary to a string."""
-
-    # Sort the keys.
-    keys = list(item.keys())
-    keys.sort()
-
-    # Return the keys and the values.
-    string = ''
-    for key in keys:
-        if key == '':
-            string += item[key]
-        else:
-            # Add content.
-            string += key
-            string += '\n'
-            string += xml_dict_to_string(item[key])
-            string += '\n'
-
-            # Get the name of the section from the key.
-            section = key[1:].split(' ')[0]
-            if section[-1] == '>':
-                section = section[:-1]
-            string += '</{}>\n'.format(section)
-
-    # Return the value.
-    return string.strip()
-
-
-def compare_xml(path1, path2, tol_float=None):
+def check_node_by_coordinate(node, axis, value, eps=1e-10):
     """
-    Compare the xml files at path1 and path2.
+    Check if the node is at a certain coordinate value.
 
     Args
     ----
-    tol_float: None / float
-        If it is None, the numbers are not changed.
-        If it is a number, the nubers in the xml file are set to 0 when the
-        absolute value is smaller that tol_float.
+    node: Node
+        The node to be checked for its position.
+    axis: int
+        Coordinate axis to check.
+        0 -> x, 1 -> y, 2 -> z
+    value: float
+        Value for the coordinate that the node should have.
+    eps: float
+        Tolerance to check for equality.
+    """
+    if np.abs(node.coordinates[axis] - value) < eps:
+        return True
+    else:
+        return False
+
+
+def get_min_max_coordinates(nodes):
+    """
+    Return an array with the minimal and maximal coordinates of the given
+    nodes.
+
+    Return
+    ----
+    min_max_coordinates:
+        [min_x, min_y, min_z, max_x, max_y, max_z]
+    """
+    coordinates = np.zeros([len(nodes), 3])
+    for i, node in enumerate(nodes):
+        coordinates[i, :] = node.coordinates
+    min_max = np.zeros(6)
+    min_max[:3] = np.min(coordinates, axis=0)
+    min_max[3:] = np.max(coordinates, axis=0)
+    return min_max
+
+
+def clean_simulation_directory(sim_dir):
+    """
+    If the simulation directory exists, the user is asked if the contents
+    should be removed. If it does not exist, it is created.
     """
 
-    # Check that both arguments are paths and exist.
-    if not (os.path.isfile(path1) and os.path.isfile(path2)):
-        raise ValueError('The paths given are not ok!')
-
-    tree1 = ET.parse(path1)
-    tree2 = ET.parse(path2)
-
-    key, value = xml_to_dict(tree1.getroot(), tol_float)
-    string1 = xml_dict_to_string({key: value})
-    hash1 = hash(string1)
-
-    key, value = xml_to_dict(tree2.getroot(), tol_float)
-    string2 = xml_dict_to_string({key: value})
-    hash2 = hash(string2)
-
-    if hash1 == hash2:
-        return True, None, None
+    # Check if simulation directory exists.
+    if os.path.exists(sim_dir):
+        print('Path "{}" already exists'.format(sim_dir))
+        while True:
+            answer = input('DELETE all contents? (y/n): ')
+            if answer.lower() == 'y':
+                for filename in os.listdir(sim_dir):
+                    file_path = os.path.join(sim_dir, filename)
+                    try:
+                        if (os.path.isfile(file_path)
+                                or os.path.islink(file_path)):
+                            os.unlink(file_path)
+                        elif os.path.isdir(file_path):
+                            shutil.rmtree(file_path)
+                    except Exception as e:
+                        ValueError(
+                            'Failed to delete %s. Reason: %s' % (file_path, e))
+                return
+            elif answer.lower() == 'n':
+                raise ValueError('Directory is not deleted!')
     else:
-        return False, string1, string2
+        Path(sim_dir).mkdir(parents=True, exist_ok=True)

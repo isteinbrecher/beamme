@@ -1,4 +1,32 @@
 # -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------
+# MeshPy: A beam finite element input generator
+#
+# MIT License
+#
+# Copyright (c) 2021 Ivo Steinbrecher
+#                    Institute for Mathematics and Computer-Based Simulation
+#                    Universitaet der Bundeswehr Muenchen
+#                    https://www.unibw.de/imcs-en
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# -----------------------------------------------------------------------------
 """
 This module defines the classes that are used to create an input file for Baci.
 """
@@ -11,8 +39,13 @@ import re
 from _collections import OrderedDict
 
 # Meshpy modules.
-from . import mpy, Mesh, BaseMeshItem, Node, Element, BoundaryCondition, \
-    GeometrySet
+from .conf import mpy
+from .mesh import Mesh
+from .base_mesh_item import BaseMeshItem
+from .node import Node
+from .element import Element
+from .boundary_condition import BoundaryConditionBase
+from .geometry_set import GeometrySet
 from .utility import get_git_data
 
 
@@ -187,6 +220,23 @@ class InputSection(object):
         return lines
 
 
+class InputSectionMultiKey(InputSection):
+    """
+    Represent a single section in the input file.
+    This section can have the same key multiple times.
+    """
+
+    def _add_data(self, option):
+        """
+        Add an InputLine object to the item. Each key can exist multiple times.
+        """
+
+        # We add each line with a key that represents the index of the line.
+        # This would be better with a list, but by doing it his way we can use
+        # the same structure as in the base class.
+        self.data[len(self.data)] = option
+
+
 class InputFile(Mesh):
     """A item that represents a complete Baci input file."""
 
@@ -205,7 +255,23 @@ class InputFile(Mesh):
         (mpy.bc.neumann,   mpy.geo.point  ): 'DESIGN POINT NEUMANN CONDITIONS',
         (mpy.bc.neumann,   mpy.geo.line   ): 'DESIGN LINE NEUMANN CONDITIONS',
         (mpy.bc.neumann,   mpy.geo.surface): 'DESIGN SURF NEUMANN CONDITIONS',
-        (mpy.bc.neumann,   mpy.geo.volume ): 'DESIGN VOL NEUMANN CONDITIONS'
+        (mpy.bc.neumann,   mpy.geo.volume ): 'DESIGN VOL NEUMANN CONDITIONS',
+        (mpy.bc.moment_euler_bernoulli, mpy.geo.point):
+            'DESIGN POINT MOMENT EB CONDITIONS',
+        (mpy.bc.beam_to_solid_volume_meshtying, mpy.geo.line):
+            'BEAM INTERACTION/BEAM TO SOLID VOLUME MESHTYING LINE',
+        (mpy.bc.beam_to_solid_volume_meshtying, mpy.geo.volume):
+            'BEAM INTERACTION/BEAM TO SOLID VOLUME MESHTYING VOLUME',
+        (mpy.bc.beam_to_solid_surface_meshtying, mpy.geo.line):
+            'BEAM INTERACTION/BEAM TO SOLID SURFACE MESHTYING LINE',
+        (mpy.bc.beam_to_solid_surface_meshtying, mpy.geo.surface):
+            'BEAM INTERACTION/BEAM TO SOLID SURFACE MESHTYING SURFACE',
+        (mpy.bc.beam_to_solid_surface_contact, mpy.geo.line):
+            'BEAM INTERACTION/BEAM TO SOLID CONTACT LINE',
+        (mpy.bc.beam_to_solid_surface_contact, mpy.geo.surface):
+            'BEAM INTERACTION/BEAM TO SOLID CONTACT SURFACE',
+        (mpy.bc.point_coupling, mpy.geo.point):
+            'DESIGN POINT COUPLING CONDITIONS'
     }
     geometry_counter = {
         mpy.geo.point:   'DPOINT',
@@ -216,7 +282,6 @@ class InputFile(Mesh):
 
     # Sections that won't be exported to input file.
     skip_sections = [
-        'FLUID ELEMENTS',
         'ALE ELEMENTS',
         'LUBRICATION ELEMENTS',
         'TRANSPORT ELEMENTS',
@@ -230,7 +295,8 @@ class InputFile(Mesh):
         'END'
     ]
 
-    def __init__(self, maintainer='', description=None, dat_file=None):
+    def __init__(self, maintainer='', description=None, dat_file=None,
+            cubit=None):
         """
         Initialize the input file.
 
@@ -243,22 +309,37 @@ class InputFile(Mesh):
         dat_file: str
             A file path to an existing input file that will be read into this
             object.
+        cubit:
+            A cubit object, that contains an input file. The input lines are
+            loaded with the get_dat_lines method. Mutually exclusive with the
+            option dat_file.
         """
 
-        Mesh.__init__(self)
+        super().__init__()
 
         self.maintainer = maintainer
         self.description = description
         self.dat_header = []
 
-        # Dictionary for all sections other than mesh sections.
+        # Contents of NOX xml file.
+        self.nox_xml = None
+        self._nox_xml_file = None
+
+        # Dictionaries for sections other than mesh sections. The multi key
+        # dictionary stores sections that can have the same key multiple times,
+        # for example knot vector section in IGA meshes.
         self.sections = OrderedDict()
+        self.sections_multi_key = []
 
         # Flag if dat file was loaded.
         self._dat_file_loaded = False
 
+        # Load existing dat files. If both of the following if statements are
+        # true, an error will be thrown.
         if dat_file is not None:
             self.read_dat(dat_file)
+        if cubit is not None:
+            self._read_dat_lines(cubit.get_dat_lines())
 
     def read_dat(self, file_path):
         """
@@ -271,16 +352,29 @@ class InputFile(Mesh):
             object.
         """
 
+        with open(file_path) as dat_file:
+            lines = dat_file.readlines()
+        self._read_dat_lines(lines)
+
+    def _read_dat_lines(self, dat_lines):
+        """
+        Add an existing input file into this object.
+
+        Args
+        ----
+        dat_lines: [str]
+            A list containing the lines of the input file.
+        """
+
         if (len(self.nodes) + len(self.elements) + len(self.materials)
-                + len(self.functions) + len(self.couplings) > 0):
+                + len(self.functions) > 0):
             raise RuntimeError('A dat file can only be loaded for an '
                 + 'empty mesh!')
         if self._dat_file_loaded:
             raise RuntimeError('It is not possible to import two dat files!')
 
-        with open(file_path) as dat_file:
-            lines = dat_file.readlines()
-        self._add_dat_lines(lines)
+        # Add the lines to this input file.
+        self._add_dat_lines(dat_lines)
 
         if mpy.import_mesh_full:
             # If the solid mesh is imported as objects, link the relevant data
@@ -302,6 +396,7 @@ class InputFile(Mesh):
                     geom_list = self.geometry_sets[bc_key[1]]
                     geom_index = boundary_condition.geometry_set
                     boundary_condition.geometry_set = geom_list[geom_index]
+                    boundary_condition.check()
 
         self._dat_file_loaded = True
 
@@ -387,7 +482,7 @@ class InputFile(Mesh):
                                 break
 
                         if mpy.import_mesh_full:
-                            bc = BoundaryCondition.from_dat(bc_key, item,
+                            bc = BoundaryConditionBase.from_dat(bc_key, item,
                                 comments=comments)
                         else:
                             bc = BaseMeshItem(item, comments=comments)
@@ -398,6 +493,10 @@ class InputFile(Mesh):
             def add_set(section_header, section_data_comment):
                 """
                 Add sets of points, lines, surfaces or volumes to the object.
+                We have to do a check of the set index, as it is possible that
+                the existing input file skips sections. If a section is skipped
+                a dummy section will be inserted, so the final numbering
+                matches the sections again.
                 """
 
                 def add_to_set(section_header, dat_list, comments):
@@ -422,14 +521,26 @@ class InputFile(Mesh):
                     dat_list = []
                     current_comments = []
                     for line, comments in section_data_comment:
-                        if last_index == int(line.split()[3]):
+                        index_line = int(line.split()[-1])
+                        if last_index == index_line:
                             dat_list.append(line)
-                        else:
-                            last_index = int(line.split()[3])
+                        elif index_line > last_index:
                             add_to_set(section_header, dat_list,
                                 current_comments)
+                            # If indices were skipped, add a dummy section
+                            # here, so the final ordering will match the
+                            # original one.
+                            for skip_index in range(last_index + 1,
+                                    index_line):
+                                add_to_set(section_header,
+                                    ['// Empty set {}'.format(skip_index)],
+                                    None)
+                            last_index = index_line
                             dat_list = [line]
                             current_comments = comments
+                        else:
+                            raise ValueError('The node set indices must be '
+                                + 'given in ascending order!')
                     # Add the last set.
                     add_to_set(section_header, dat_list, current_comments)
 
@@ -455,12 +566,24 @@ class InputFile(Mesh):
                         self.elements.append(Element.from_dat(line))
                     else:
                         add_line(self.elements, line)
+            elif section_name == 'FLUID ELEMENTS':
+                for line in section_data_comment:
+                    if mpy.import_mesh_full:
+                        raise NotImplementedError(
+                            'Fluid elements in combination with '
+                            + 'mpy.import_mesh_full == True is not yet '
+                            + 'implemented!')
+                    else:
+                        add_line(self.elements_fluid, line)
             elif section_name.startswith('FUNCT'):
                 self.functions.append(BaseMeshItem(section_data))
-            elif section_name.endswith('CONDITIONS'):
+            elif section_name in self.boundary_condition_names.values():
                 add_bc(section_name, section_data_comment)
             elif section_name.endswith('TOPOLOGY'):
                 add_set(section_name, section_data_comment)
+            elif section_name == 'STRUCTURE KNOTVECTORS':
+                self.sections_multi_key.append(InputSectionMultiKey(
+                    section_name, section_data, **kwargs))
             elif section_name == 'DESIGN DESCRIPTION' or \
                     section_name == 'END':
                 # Skip those sections as they won't be used!
@@ -482,7 +605,7 @@ class InputFile(Mesh):
         elif len(args) == 1 and isinstance(args[0], str):
             self._add_dat_lines(args[0], **kwargs)
         else:
-            Mesh.add(self, *args, **kwargs)
+            super().add(*args, **kwargs)
 
     def add_section(self, section):
         """
@@ -501,15 +624,41 @@ class InputFile(Mesh):
         else:
             raise Warning('Section {} does not exist!'.format(section_name))
 
-    def write_input_file(self, file_path, **kwargs):
-        """Write the input to a file."""
+    def write_input_file(self, file_path, nox_xml_file=None, **kwargs):
+        """
+        Write the input to a file.
+
+        Args
+        ----
+        file_path: str
+            Path to the input file that should be created.
+        nox_xml_file: str
+            (optional) If this argument is given, the xml file will be created
+            with this name, in the same directory as the input file.
+        """
+
+        # Check if a xml file needs to be written.
+        if self.nox_xml is not None:
+            if nox_xml_file is None:
+                # Get the name of the xml file.
+                self._nox_xml_file = os.path.splitext(
+                    os.path.basename(file_path))[0] + '.xml'
+            else:
+                self._nox_xml_file = nox_xml_file
+
+            # Write the xml file to the disc.
+            with open(os.path.join(os.path.dirname(file_path),
+                        self._nox_xml_file
+                    ), 'w') as xml_file:
+                xml_file.write(self.nox_xml)
+
         with open(file_path, 'w') as input_file:
             for line in self.get_dat_lines(**kwargs):
                 input_file.write(line)
                 input_file.write('\n')
 
     def get_dat_lines(self, header=True, dat_header=True,
-            add_script_to_header=True):
+            add_script_to_header=True, check_nox=True):
         """
         Return the lines for the input file for the whole object.
 
@@ -522,18 +671,46 @@ class InputFile(Mesh):
         append_script_to_header: bool
             If true, a copy of the executing script will be added to the input
             file. This is only in affect when dat_header==True.
+        check_nox: bool
+            If this is true, an error will be thrown if no nox file is set.
         """
+
+        # Perform some checks on the mesh.
+        if mpy.check_overlapping_elements:
+            self.check_overlapping_elements()
 
         # List that will contain all input lines.
         lines = []
 
         # Add header to the input file.
         end_text = None
+        lines.append('// ' + '-' * 77)
+        lines.append('// This input file was created with MeshPy.')
+        lines.append('// Copyright (c) 2021 Ivo Steinbrecher')
+        lines.append('//            Institute for Mathematics '
+            + 'and Computer-Based Simulation')
+        lines.append('//            Universitaet der Bundeswehr Muenchen')
+        lines.append('//            https://www.unibw.de/imcs-en')
+        lines.append('// ' + '-' * 77)
         if header:
             header_text, end_text = self._get_header(add_script_to_header)
             lines.append(header_text)
         if dat_header:
             lines.extend(self.dat_header)
+
+        # Check if a file has to be created for the NOX xml information.
+        if self.nox_xml is not None:
+            if self._nox_xml_file is None:
+                if check_nox:
+                    raise ValueError('NOX xml content is given, but no '
+                        + 'file defined!')
+                else:
+                    nox_xml_name = 'NOT_DEFINED'
+            else:
+                nox_xml_name = self._nox_xml_file
+            self.add(InputSection(
+                'STRUCT NOX/Status Test',
+                'XML File = {}'.format(nox_xml_name), option_overwrite=True))
 
         # Export the basic sections in the input file.
         for section in self.sections.values():
@@ -557,10 +734,9 @@ class InputFile(Mesh):
 
         # Assign global indices to all entries.
         set_n_global(self.nodes)
-        set_n_global(self.elements)
+        set_n_global(self.elements_fluid + self.elements)
         set_n_global(self.materials)
         set_n_global(self.functions)
-        set_n_global(self.couplings)
         for key in self.boundary_conditions.keys():
             set_n_global(self.boundary_conditions[key])
 
@@ -596,6 +772,13 @@ class InputFile(Mesh):
         lines.append('NDSURF {}'.format(len(mesh_sets[mpy.geo.surface])))
         lines.append('NDVOL {}'.format(len(mesh_sets[mpy.geo.volume])))
 
+        # If there are couplings in the mesh, set the link between the nodes
+        # and elements, so the couplings can decide which DOFs they couple,
+        # depending on the type of the connected beam element.
+        if (len(self.boundary_conditions[mpy.bc.point_coupling, mpy.geo.point])
+                > 0):
+            self.set_node_links()
+
         # Add the boundary conditions.
         for (bc_key, geom_key), bc_list in self.boundary_conditions.items():
             if len(bc_list) > 0:
@@ -608,18 +791,6 @@ class InputFile(Mesh):
                         )
                     )
 
-        # Add the couplings.
-        if len(self.couplings) > 0:
-            # Set the link for the nodes, so the couplings can decide which
-            # DOFs they couple.
-            self.set_node_links()
-
-            get_section_dat(
-                get_section_string('DESIGN POINT COUPLING CONDITIONS'),
-                self.couplings,
-                header_lines='DPOINT {}'.format(len(self.couplings))
-                )
-
         # Add the geometry sets.
         for geom_key, item in mesh_sets.items():
             if len(item) > 0:
@@ -628,9 +799,14 @@ class InputFile(Mesh):
                     item
                     )
 
+        # Add the multi key sections, eg. knot vectors for nurbs.
+        for section in self.sections_multi_key:
+            lines.extend(section.get_dat_lines())
+
         # Add the nodes and elements.
         get_section_dat('NODE COORDS', self.nodes)
         get_section_dat('STRUCTURE ELEMENTS', self.elements)
+        get_section_dat('FLUID ELEMENTS', self.elements_fluid)
 
         # The last section is END
         lines.extend(InputSection('END').get_dat_lines())
@@ -678,10 +854,9 @@ class InputFile(Mesh):
         headers.append(script_header)
 
         # Header containing meshpy information.
-        headers.append(('// Input file created with meshpy {}\n'
+        headers.append(('// Input file created with meshpy\n'
             + '// git sha:    {}\n'
             + '// git date:   {}\n').format(
-                mpy.version,
                 mpy.git_sha,
                 mpy.git_date
                 ))
@@ -724,113 +899,3 @@ class InputFile(Mesh):
 
         return (string_line + '\n' + (string_line + '\n').join(headers) + \
             string_line), end_text
-
-    def set_default_header_static(self, *,
-            time_step=1.,
-            n_steps=1,
-            max_time=None,
-            max_iter=20,
-            tol_res=1e-7,
-            tol_disp=1e-11,
-            binning_bounding_box=None,
-            option_overwrite=False
-            ):
-        """
-        Set default header parameters for a static analysis.
-        """
-
-        # Set values for the parameters that can not directly be set by
-        # keyword arguments.
-        if binning_bounding_box is None:
-            # No binning.
-            binning = False
-        elif isinstance(binning_bounding_box, bool) and binning_bounding_box:
-            # Default binning.
-            binning = True
-            binning_bounding_box = [-1, -1, -1, 1, 1, 1]
-        elif (isinstance(binning_bounding_box, list)
-                and len(binning_bounding_box) == 6):
-            # User given boundary box.
-            binning = True
-
-        self.add('''
-            ------------------------------------PROBLEM SIZE
-            DIM 3
-            ------------------------------------PROBLEM TYP
-            PROBLEMTYP                            Structure
-            RESTART                               0
-            --------------------------------------IO
-            OUTPUT_BIN                            No
-            STRUCT_DISP                           No
-            FILESTEPS                             1000
-            VERBOSITY                             Standard
-            ''', option_overwrite=option_overwrite)
-
-        # Output / beam output.
-        self.add(InputSection(
-            'IO/RUNTIME VTK OUTPUT',
-            '''
-            OUTPUT_DATA_FORMAT                    binary
-            INTERVAL_STEPS                        1
-            EVERY_ITERATION                       No
-            ''', option_overwrite=option_overwrite))
-        self.add(InputSection(
-            'IO/RUNTIME VTK OUTPUT/BEAMS',
-            '''
-            OUTPUT_BEAMS                    Yes
-            DISPLACEMENT                    Yes
-            USE_ABSOLUTE_POSITIONS          Yes
-            TRIAD_VISUALIZATIONPOINT        Yes
-            STRAINS_GAUSSPOINT              Yes
-            ''', option_overwrite=option_overwrite))
-
-        # Problem type settings.
-        if max_time is None:
-            max_time = time_step * n_steps
-        self.add(InputSection('STRUCTURAL DYNAMIC',
-            '''
-            LINEAR_SOLVER                         1
-            INT_STRATEGY                          Standard
-            DYNAMICTYP                            Statics
-            RESULTSEVRY                           1
-            NLNSOL                                fullnewton
-            PREDICT                               TangDis
-            TIMESTEP                              {0}
-            NUMSTEP                               {1}
-            MAXTIME                               {2}
-            TOLRES                                {3}
-            TOLDISP                               {4}
-            NORM_RESF                             Abs
-            NORM_DISP                             Abs
-            NORMCOMBI_RESFDISP                    And
-            MAXITER                               {5}
-            '''.format(
-                time_step,
-                n_steps,
-                max_time,
-                tol_res,
-                tol_disp,
-                max_iter
-                ),
-            option_overwrite=option_overwrite))
-
-        # Solver
-        self.add(InputSection(
-            'SOLVER 1',
-            '''
-            NAME                                  Structure_Solver
-            SOLVER                                Superlu
-            ''', option_overwrite=option_overwrite))
-
-        # Binning strategy.
-        if binning:
-            bounding_box_string = ''
-            for val in binning_bounding_box:
-                bounding_box_string += ' {}'.format(val)
-            self.add(InputSection(
-                'BINNING STRATEGY',
-                '''
-                CUTOFF_RADIUS 2
-                BOUNDINGBOX {}
-                '''.format(bounding_box_string),
-                option_overwrite=option_overwrite))

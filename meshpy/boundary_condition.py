@@ -1,4 +1,32 @@
 # -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------
+# MeshPy: A beam finite element input generator
+#
+# MIT License
+#
+# Copyright (c) 2021 Ivo Steinbrecher
+#                    Institute for Mathematics and Computer-Based Simulation
+#                    Universitaet der Bundeswehr Muenchen
+#                    https://www.unibw.de/imcs-en
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# -----------------------------------------------------------------------------
 """
 This module implements a class to handle boundary conditions in the input file.
 """
@@ -7,14 +35,76 @@ This module implements a class to handle boundary conditions in the input file.
 import warnings
 
 # Meshpy modules.
-from . import mpy, BaseMeshItem, get_close_nodes
+from .conf import mpy
+from .base_mesh_item import BaseMeshItem
+from .utility import find_close_nodes
 
 
-class BoundaryCondition(BaseMeshItem):
-    """This object represents one boundary condition in the input file."""
+class BoundaryConditionBase(BaseMeshItem):
+    """
+    This is a base object, which represents one boundary condition in the input
+    file, e.g. Dirichlet, Neumann, coupling or beam-to-solid.
+    """
+
+    def __init__(self, geometry_set, bc_type=None, is_dat=False, **kwargs):
+        """
+        Initialize the object.
+
+        Args
+        ----
+        geometry_set: GeometrySet, int
+            Geometry that this boundary condition acts on. An integer can be
+            given, in the case a dat file is imported. This integer is only
+            temporary and will be replaced with the GeometrySet object.
+        bc_type: mpy.bc
+            Type of the boundary condition.
+        is_dat: bool
+            If this object stems from an dat file.
+        """
+
+        super().__init__(is_dat=is_dat, **kwargs)
+        self.bc_type = bc_type
+        self.geometry_set = geometry_set
+
+    @classmethod
+    def from_dat(cls, bc_key, line, **kwargs):
+        """
+        This function acts as a factory and creates the correct boundary
+        condition object from a line in the dat file. The geometry set is
+        passed as integer (0 based index) and will be connected after the whole
+        input file is parsed.
+        """
+
+        # Split up the input line.
+        split = line.split()
+
+        if (bc_key is mpy.bc.dirichlet
+                or bc_key is mpy.bc.neumann
+                or bc_key is mpy.bc.beam_to_solid_surface_meshtying
+                or bc_key is mpy.bc.beam_to_solid_surface_contact
+                or bc_key is mpy.bc.beam_to_solid_volume_meshtying):
+            # Normal boundary condition (including beam-to-solid conditions).
+            return BoundaryCondition(
+                int(split[1]) - 1, ' '.join(split[3:]),
+                bc_type=bc_key, is_dat=True, **kwargs
+                )
+        elif bc_key is mpy.bc.point_coupling:
+            # Coupling condition.
+            from .coupling import Coupling
+            return Coupling(int(split[1]) - 1, ' '.join(split[3:]),
+                is_dat=True, **kwargs)
+        else:
+            raise ValueError('Got unexpected boundary condition!')
+
+
+class BoundaryCondition(BoundaryConditionBase):
+    """
+    This object represents a Dirichlet, Neumann or beam-to-solid boundary
+    condition.
+    """
 
     def __init__(self, geometry_set, bc_string, format_replacement=None,
-            bc_type=None, comments=None, **kwargs):
+            bc_type=None, double_nodes=None, **kwargs):
         """
         Initialize the object.
 
@@ -28,34 +118,22 @@ class BoundaryCondition(BaseMeshItem):
         format_replacement: str, list
             Replacement with the str.format() function for bc_string.
         bc_type: mpy.boundary
-            Type of the boundary condition (dirichlet or neumann).
+            Type of the boundary condition.
+        double_nodes: mpy.double_nodes
+            Depending on this parameter, it will be checked if point Neumann
+            conditions do contain nodes at the same spatial positions.
         """
 
-        BaseMeshItem.__init__(self, is_dat=False, comments=comments)
+        BoundaryConditionBase.__init__(self, geometry_set, bc_type=bc_type,
+            **kwargs)
         self.bc_string = bc_string
-        self.bc_type = bc_type
         self.format_replacement = format_replacement
-        self.geometry_set = geometry_set
+        self.double_nodes = double_nodes
 
         # Check the parameters for this object.
-        self._check_multiple_nodes(**kwargs)
+        self.check()
 
-    @classmethod
-    def from_dat(cls, bc_key, line, **kwargs):
-        """
-        Get a boundary condition from an input line in a dat file. The geometry
-        set is passed as integer (0 based index) and will be connected after
-        the whole input file is parsed.
-        """
-
-        # Split up the input line.
-        split = line.split()
-
-        # Set up class with values for solid mesh import
-        return cls(int(split[1]) - 1, ' '.join(split[3:]), bc_type=bc_key,
-            **kwargs)
-
-    def _get_dat(self, **kwargs):
+    def _get_dat(self):
         """
         Add the content of this object to the list of lines.
 
@@ -65,7 +143,7 @@ class BoundaryCondition(BaseMeshItem):
             The contents of this object will be added to the end of lines.
         """
 
-        if self.format_replacement:
+        if self.format_replacement is not None:
             dat_string = self.bc_string.format(*self.format_replacement)
         else:
             dat_string = self.bc_string
@@ -75,7 +153,7 @@ class BoundaryCondition(BaseMeshItem):
             dat_string
             )
 
-    def _check_multiple_nodes(self, double_nodes=None):
+    def check(self):
         """
         Check for point Neumann boundaries that there is not a double
         Node in the set.
@@ -85,12 +163,12 @@ class BoundaryCondition(BaseMeshItem):
             # In the case of solid imports this is a integer at initialization.
             return
 
-        if double_nodes is mpy.double_nodes.keep:
+        if self.double_nodes is mpy.double_nodes.keep:
             return
 
         if (self.bc_type == mpy.bc.neumann
                 and self.geometry_set.geometry_type == mpy.geo.point):
-            partners = get_close_nodes(self.geometry_set.nodes)
+            partners = find_close_nodes(self.geometry_set.nodes)
             # Create a list with nodes that will not be kept in the set.
             double_node_list = []
             for node_list in partners:
@@ -98,7 +176,7 @@ class BoundaryCondition(BaseMeshItem):
                     if i > 0:
                         double_node_list.append(node)
             if (len(double_node_list) > 0 and
-                    double_nodes is mpy.double_nodes.remove):
+                    self.double_nodes is mpy.double_nodes.remove):
                 # Create the nodes again for the set.
                 self.geometry_set.nodes = [node for node in
                     self.geometry_set.nodes if (node not in double_node_list)]

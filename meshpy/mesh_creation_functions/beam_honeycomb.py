@@ -1,4 +1,32 @@
 # -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------
+# MeshPy: A beam finite element input generator
+#
+# MIT License
+#
+# Copyright (c) 2021 Ivo Steinbrecher
+#                    Institute for Mathematics and Computer-Based Simulation
+#                    Universitaet der Bundeswehr Muenchen
+#                    https://www.unibw.de/imcs-en
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# -----------------------------------------------------------------------------
 """
 This file has functions to create a honeycomb beam mesh.
 """
@@ -7,8 +35,12 @@ This file has functions to create a honeycomb beam mesh.
 import numpy as np
 
 # Meshpy modules.
-from .. import mpy, Rotation, Mesh, GeometryName, GeometrySet
-from . import create_beam_mesh_line
+from ..conf import mpy
+from ..rotation import Rotation
+from ..mesh import Mesh
+from ..container import GeometryName
+from ..geometry_set import GeometrySet
+from .beam_basic_geometry import create_beam_mesh_line
 
 
 def create_beam_mesh_honeycomb_flat(mesh, beam_object, material, width,
@@ -150,7 +182,7 @@ def create_beam_mesh_honeycomb(mesh, beam_object, material, diameter,
         n_circumference, n_axis, *, n_el=1, closed_top=True, vertical=True,
         add_sets=False):
     """
-    Add a honeycomb structure around a cylinder. The cylinder axis will be
+    Wrap a honeycomb structure around a cylinder. The cylinder axis will be
     the z-axis.
 
     Args

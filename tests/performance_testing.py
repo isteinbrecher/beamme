@@ -1,4 +1,32 @@
 # -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------
+# MeshPy: A beam finite element input generator
+#
+# MIT License
+#
+# Copyright (c) 2021 Ivo Steinbrecher
+#                    Institute for Mathematics and Computer-Based Simulation
+#                    Universitaet der Bundeswehr Muenchen
+#                    https://www.unibw.de/imcs-en
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# -----------------------------------------------------------------------------
 """
 Create a couple of different mesh cases and test the performance.
 """
@@ -10,24 +38,20 @@ import numpy as np
 import os
 import socket
 import warnings
+import sys
 
 # Meshpy imports.
-from meshpy import mpy, InputFile, Mesh, MaterialReissner, Beam3rHerm2Lin3, \
-    Rotation
+from meshpy import (mpy, InputFile, Mesh, MaterialReissner, Beam3rHerm2Line3,
+    Rotation, find_close_nodes)
 
-from meshpy.mesh_creation_functions.beam_basic_geometry import \
+from meshpy.mesh_creation_functions.beam_basic_geometry import (
     create_beam_mesh_line
+    )
+
+from tests.testing_utility import empty_testing_directory, testing_temp
 
 # Cubitpy imports.
 from cubitpy import cupy, CubitPy
-
-
-# Directories and files for testing.
-testing_path = os.path.abspath(os.path.dirname(__file__))
-testing_temp = os.path.join(testing_path, 'testing-tmp')
-testing_solid_block = os.path.join(testing_temp,
-    'performance_testing_solid.dat')
-testing_beam = os.path.join(testing_temp, 'performance_testing_beam.dat')
 
 
 def create_solid_block(file_path, nx, ny, nz):
@@ -53,26 +77,28 @@ def create_solid_block(file_path, nx, ny, nz):
     brick.volumes()[0].mesh()
 
     # Add block and sets.
-    cubit.add_element_type(brick.volumes()[0], 'HEX8', name='brick', bc=[
-        'STRUCTURE',
-        'MAT 1 KINEM nonlinear EAS none',
-        'SOLIDH8'
-        ])
+    cubit.add_element_type(brick.volumes()[0], cupy.element_type.hex8,
+        name='brick',
+        bc_description='MAT 1 KINEM nonlinear EAS none'
+        )
     counter = 0
     for item in brick.vertices():
-        cubit.add_node_set(item, name='node_set_' + str(counter), bc=[
-            'DESIGN POINT NEUMANN CONDITIONS',
-            'NUMDOF 6 ONOFF 1 1 1 0 0 0 VAL 3.0 3.0 0.0 0.0 0.0 0.0 FUNCT 1 2 0 0 0 0'])
+        cubit.add_node_set(item, name='node_set_' + str(counter),
+            bc_type=cupy.bc_type.neumann,
+            bc_description='NUMDOF 6 ONOFF 1 1 1 0 0 0 VAL 3.0 3.0 0.0 0.0 0.0'
+                + ' 0.0 FUNCT 1 2 0 0 0 0')
         counter += 1
     for item in brick.curves():
-        cubit.add_node_set(item, name='node_set_' + str(counter), bc=[
-            'DESIGN LINE DIRICH CONDITIONS',
-            'NUMDOF 6 ONOFF 1 1 1 0 0 0 VAL 3.0 3.0 0.0 0.0 0.0 0.0 FUNCT 1 2 0 0 0 0'])
+        cubit.add_node_set(item, name='node_set_' + str(counter),
+            bc_type=cupy.bc_type.dirichlet,
+            bc_description='NUMDOF 6 ONOFF 1 1 1 0 0 0 VAL 3.0 3.0 0.0 0.0 0.0'
+                + ' 0.0 FUNCT 1 2 0 0 0 0')
         counter += 1
     for item in brick.surfaces():
-        cubit.add_node_set(item, name='node_set_' + str(counter), bc=[
-            'DESIGN SURF NEUMANN CONDITIONS',
-            'NUMDOF 6 ONOFF 1 1 1 0 0 0 VAL 3.0 3.0 0.0 0.0 0.0 0.0 FUNCT 1 2 0 0 0 0'])
+        cubit.add_node_set(item, name='node_set_' + str(counter),
+            bc_type=cupy.bc_type.neumann,
+            bc_description='NUMDOF 6 ONOFF 1 1 1 0 0 0 VAL 3.0 3.0 0.0 0.0 0.0'
+                + ' 0.0 FUNCT 1 2 0 0 0 0')
         counter += 1
 
     # Export mesh
@@ -100,71 +126,31 @@ def create_large_beam_mesh(nx, ny, nz, n_el):
 
     for ix in range(nx + 1):
         for iy in range(ny + 1):
-            create_beam_mesh_line(mesh, Beam3rHerm2Lin3, material,
+            create_beam_mesh_line(mesh, Beam3rHerm2Line3, material,
                 [ix / nx, iy / ny, 0],
                 [ix / nx, iy / ny, 1],
                 n_el=nz * n_el)
     for iy in range(ny + 1):
         for iz in range(nz + 1):
-            create_beam_mesh_line(mesh, Beam3rHerm2Lin3, material,
+            create_beam_mesh_line(mesh, Beam3rHerm2Line3, material,
                 [0, iy / ny, iz / nz],
                 [1, iy / ny, iz / nz],
                 n_el=nx * n_el)
     for iz in range(nz + 1):
         for ix in range(nx + 1):
-            create_beam_mesh_line(mesh, Beam3rHerm2Lin3, material,
+            create_beam_mesh_line(mesh, Beam3rHerm2Line3, material,
                 [ix / nx, 0, iz / nz],
                 [ix / nx, 1, iz / nz],
                 n_el=ny * n_el)
     return mesh
 
 
-def time_function(name, funct, args=None, kwargs=None):
+class TestPerformance(object):
     """
-    Execute a function and check if the time is as expected.
+    A class to test meshpy performance.
     """
 
-    if args is None:
-        args = []
-    if kwargs is None:
-        kwargs = {}
-
-    # Get the expected time for this function.
-    host = socket.gethostname()
-    if host in expected_times.keys():
-        if name in expected_times[host].keys():
-            expected_time = expected_times[host][name]
-        else:
-            raise ValueError('Function name {} not found!'.format(name))
-    else:
-        raise ValueError('Host {} not found!'.format(host))
-
-    # Time before the execution.
-    start_time = time.time()
-
-    # Execute the function.
-    return_val = funct(*args, **kwargs)
-
-    # Check the elapsed time.
-    elapsed_time = time.time() - start_time
-    print(
-        'Times for {}:\n'.format(name)
-        + '    Expected: {:.3g}sec\n'.format(expected_time)
-        + '    Actual:   {:.3g}sec'.format(elapsed_time)
-        )
-    if expected_time > elapsed_time:
-        print('    OK')
-    else:
-        warnings.warn('Expected time not reached in '
-            + 'function {}!'.format(name))
-
-    # Return what the function would have given.
-    return return_val
-
-
-if __name__ == '__main__':
-    """Execute part of script."""
-
+    # Set expected test times.
     expected_times = {}
     expected_times['adonis'] = {
         'cubitpy_create_solid': 3.2,
@@ -174,74 +160,162 @@ if __name__ == '__main__':
         'meshpy_rotate': 0.6,
         'meshpy_translate': 0.6,
         'meshpy_reflect': 0.7,
-        'meshpy_wrap_around_cylinder': 0.9,
-        'meshpy_get_close_nodes': 1.1,
+        'meshpy_wrap_around_cylinder': 3.0,
+        'meshpy_wrap_around_cylinder_without_check': 0.9,
+        'meshpy_find_close_nodes': 2.0,
         'meshpy_write_dat': 12.5,
         'meshpy_write_vtk': 19
         }
+    expected_times['sisyphos.bauv.unibw-muenchen.de'] = {
+        'cubitpy_create_solid': 3.0,
+        'meshpy_load_solid': 0.9,
+        'meshpy_load_solid_full': 2.8,
+        'meshpy_create_beams': 6.0,
+        'meshpy_rotate': 0.6,
+        'meshpy_translate': 0.5,
+        'meshpy_reflect': 0.7,
+        'meshpy_wrap_around_cylinder': 2.0,
+        'meshpy_wrap_around_cylinder_without_check': 0.7,
+        'meshpy_find_close_nodes': 1.6,
+        'meshpy_write_dat': 10.5,
+        'meshpy_write_vtk': 17.0
+        }
 
-    time_function(
+    def __init__(self):
+        """
+        Initialize counters.
+        """
+
+        self.passed_tests = 0
+        self.failed_tests = 0
+
+    def time_function(self, name, funct, args=None, kwargs=None):
+        """
+        Execute a function and check if the time is as expected.
+        """
+
+        if args is None:
+            args = []
+        if kwargs is None:
+            kwargs = {}
+
+        # Get the expected time for this function.
+        host = socket.gethostname()
+        if host in self.expected_times.keys():
+            if name in self.expected_times[host].keys():
+                expected_time = self.expected_times[host][name]
+            else:
+                raise ValueError('Function name {} not found!'.format(name))
+        else:
+            raise ValueError('Host {} not found!'.format(host))
+
+        # Time before the execution.
+        start_time = time.time()
+
+        # Execute the function.
+        return_val = funct(*args, **kwargs)
+
+        # Check the elapsed time.
+        elapsed_time = time.time() - start_time
+        print(
+            'Times for {}:\n'.format(name)
+            + '    Expected: {:.3g}sec\n'.format(expected_time)
+            + '    Actual:   {:.3g}sec'.format(elapsed_time)
+            )
+        if expected_time > elapsed_time:
+            self.passed_tests += 1
+            print('    OK')
+        else:
+            self.failed_tests += 1
+            print('    FAILED')
+            warnings.warn('Expected time not reached in '
+                + 'function {}!'.format(name))
+
+        # Return what the function would have given.
+        return return_val
+
+
+if __name__ == '__main__':
+    """Execute part of script."""
+
+    # Directories and files for testing.
+    testing_solid_block = os.path.join(testing_temp,
+        'performance_testing_solid.dat')
+    testing_beam = os.path.join(testing_temp, 'performance_testing_beam.dat')
+
+    empty_testing_directory()
+
+    test_performance = TestPerformance()
+
+    test_performance.time_function(
         'cubitpy_create_solid',
         create_solid_block,
         args=[testing_solid_block, 100, 100, 10]
         )
 
-    time_function(
+    test_performance.time_function(
         'meshpy_load_solid',
         load_solid,
         args=[testing_solid_block, False]
         )
 
-    time_function(
+    test_performance.time_function(
         'meshpy_load_solid_full',
         load_solid,
         args=[testing_solid_block, True]
         )
 
-    mesh = time_function(
+    mesh = test_performance.time_function(
         'meshpy_create_beams',
         create_large_beam_mesh,
         args=[40, 40, 10, 2]
         )
 
-    time_function(
+    test_performance.time_function(
         'meshpy_rotate',
         Mesh.rotate,
         args=[mesh, Rotation([1, 1, 0], np.pi / 3)]
         )
 
-    time_function(
+    test_performance.time_function(
         'meshpy_translate',
         Mesh.translate,
         args=[mesh, [0.5, 0, 0]]
         )
 
-    time_function(
+    test_performance.time_function(
         'meshpy_reflect',
         Mesh.reflect,
         args=[mesh, [0.5, 0.4, 0.1]]
         )
 
-    time_function(
+    test_performance.time_function(
         'meshpy_wrap_around_cylinder',
         Mesh.wrap_around_cylinder,
         args=[mesh],
         kwargs={'radius': 1.}
         )
 
-    time_function(
-        'meshpy_get_close_nodes',
-        Mesh.get_close_nodes,
-        args=[mesh, mesh.nodes]
+    test_performance.time_function(
+        'meshpy_wrap_around_cylinder_without_check',
+        Mesh.wrap_around_cylinder,
+        args=[mesh],
+        kwargs={'radius': 1., 'advanced_warning': False}
         )
 
-    time_function(
+    test_performance.time_function(
+        'meshpy_find_close_nodes',
+        find_close_nodes,
+        args=[mesh.nodes]
+        )
+
+    test_performance.time_function(
         'meshpy_write_dat',
         InputFile.write_input_file,
         args=[mesh, testing_beam]
         )
 
-    time_function(
+    test_performance.time_function(
         'meshpy_write_vtk',
         Mesh.write_vtk,
         args=[mesh],
@@ -250,3 +324,8 @@ if __name__ == '__main__':
             'output_directory': testing_temp
             }
         )
+
+    if test_performance.failed_tests > 0:
+        sys.exit(1)
+    else:
+        sys.exit(0)

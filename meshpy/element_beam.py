@@ -1,4 +1,32 @@
 # -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------
+# MeshPy: A beam finite element input generator
+#
+# MIT License
+#
+# Copyright (c) 2021 Ivo Steinbrecher
+#                    Institute for Mathematics and Computer-Based Simulation
+#                    Universitaet der Bundeswehr Muenchen
+#                    https://www.unibw.de/imcs-en
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# -----------------------------------------------------------------------------
 """
 This module implements beam elements for the mesh.
 """
@@ -9,8 +37,12 @@ import vtk
 import warnings
 
 # Meshpy modules.
-from . import mpy, Element, Node, add_point_data_node_sets, MaterialReissner, \
-    MaterialKirchhoff, BaseMeshItem
+from .conf import mpy
+from .element import Element
+from .node import Node
+from .vtk_writer import add_point_data_node_sets
+from .material import (MaterialReissner, MaterialKirchhoff,
+    MaterialEulerBernoulli, BaseMeshItem)
 
 
 class Beam(Element):
@@ -26,8 +58,12 @@ class Beam(Element):
     # A list of valid material types for this element.
     valid_material = []
 
+    # Coupling strings.
+    coupling_fix_string = None
+    coupling_joint_string = None
+
     def __init__(self, material=None, nodes=None):
-        Element.__init__(self, nodes=nodes, material=material)
+        super().__init__(nodes=nodes, material=material)
 
     def create_beam(self, beam_function, start_node=None, end_node=None):
         """
@@ -149,6 +185,26 @@ class Beam(Element):
         # Return the created nodes.
         return created_nodes
 
+    @classmethod
+    def get_coupling_string(cls, coupling_type):
+        """
+        Return the string to couple this beam to another beam.
+        """
+
+        if coupling_type is mpy.coupling.joint:
+            if cls.coupling_joint_string is None:
+                raise ValueError(('Joint coupling is not implemented for '
+                    '{}').format(cls))
+            return cls.coupling_joint_string
+        elif coupling_type is mpy.coupling.fix:
+            if cls.coupling_fix_string is None:
+                raise ValueError(('Fix coupling is not implemented for '
+                    '{}').format(cls))
+            return cls.coupling_fix_string
+        else:
+            raise ValueError(('coupling_type "{}" is not '
+                + 'implemented!').format(coupling_type))
+
     def flip(self):
         """
         Reverse the nodes of this element. This is usually used when reflected.
@@ -179,7 +235,7 @@ class Beam(Element):
         """
 
         # Dictionary with cell data.
-        cell_data = {}
+        cell_data = self.vtk_cell_data.copy()
         cell_data['cross_section_radius'] = self.material.radius
 
         # Dictionary with point data.
@@ -191,6 +247,7 @@ class Beam(Element):
 
         # Array with nodal coordinates.
         coordinates = np.zeros([len(self.nodes), 3])
+        element_partner_index = None
         for i, node in enumerate(self.nodes):
             coordinates[i, :] = node.coordinates
             if node.is_middle_node:
@@ -207,6 +264,14 @@ class Beam(Element):
             point_data['base_vector_2'].append(R[:, 1])
             point_data['base_vector_3'].append(R[:, 2])
 
+            # Check if the element has a double middle node.
+            if node.element_partner_index is not None:
+                element_partner_index = node.element_partner_index + 1
+
+        # Check if a cell attribute for the partner should be added.
+        if element_partner_index is not None:
+            cell_data['partner_index'] = element_partner_index
+
         # Add the node sets connected to this element.
         add_point_data_node_sets(point_data, self.nodes)
 
@@ -215,8 +280,8 @@ class Beam(Element):
             cell_data=cell_data, point_data=point_data)
 
 
-class Beam3rHerm2Lin3(Beam):
-    """Represents a BEAM3R HERM2LIN3 element."""
+class Beam3rHerm2Line3(Beam):
+    """Represents a BEAM3R HERM2LINE3 element."""
 
     nodes_create = [
         [-1, True, False],
@@ -225,6 +290,9 @@ class Beam3rHerm2Lin3(Beam):
         ]
     beam_type = mpy.beam.reissner
     valid_material = [MaterialReissner, BaseMeshItem]
+
+    coupling_fix_string = 'NUMDOF 9 ONOFF 1 1 1 1 1 1 0 0 0'
+    coupling_joint_string = 'NUMDOF 9 ONOFF 1 1 1 0 0 0 0 0 0'
 
     def _get_dat(self):
         """ Return the line for the input file. """
@@ -239,7 +307,44 @@ class Beam3rHerm2Lin3(Beam):
         # Check the material.
         self._check_material()
 
-        return '{} BEAM3R HERM2LIN3 {}MAT {} TRIADS{}'.format(
+        return '{} BEAM3R HERM2LINE3 {}MAT {} TRIADS{}'.format(
+            self.n_global,
+            string_nodes,
+            self.material.n_global,
+            string_triads
+            )
+
+
+class Beam3rLine2Line2(Beam):
+    """
+    Represents a Reissner beam with linear shapefunctions in the rotations as
+    well as the displacements.
+    """
+
+    nodes_create = [
+        [-1, True, False],
+        [1, True, False]
+        ]
+    beam_type = mpy.beam.reissner
+    valid_material = [MaterialReissner, BaseMeshItem]
+
+    coupling_fix_string = 'NUMDOF 6 ONOFF 1 1 1 1 1 1'
+    coupling_joint_string = 'NUMDOF 6 ONOFF 1 1 1 0 0 0'
+
+    def _get_dat(self):
+        """ Return the line for the input file. """
+
+        string_nodes = ''
+        string_triads = ''
+        for i in [0, 1]:
+            node = self.nodes[i]
+            string_nodes += '{} '.format(node.n_global)
+            string_triads += ' ' + node.rotation.get_dat()
+
+        # Check the material.
+        self._check_material()
+
+        return '{} BEAM3R LINE2 {}MAT {} TRIADS{}'.format(
             self.n_global,
             string_nodes,
             self.material.n_global,
@@ -257,6 +362,9 @@ class Beam3kClass(Beam):
         ]
     beam_type = mpy.beam.kirchhoff
     valid_material = [MaterialKirchhoff, BaseMeshItem]
+
+    coupling_fix_string = 'NUMDOF 7 ONOFF 1 1 1 1 1 1 0'
+    coupling_joint_string = 'NUMDOF 7 ONOFF 1 1 1 0 0 0 0'
 
     def __init__(self, *, weak=True, rotvec=True, FAD=True, **kwargs):
         Beam.__init__(self, **kwargs)
@@ -284,7 +392,7 @@ class Beam3kClass(Beam):
         # Check the material.
         self._check_material()
 
-        string_dat = ('{} BEAM3K LIN3 {} WK {} ROTVEC {} MAT {} ' +
+        string_dat = ('{} BEAM3K LINE3 {} WK {} ROTVEC {} MAT {} ' +
             'TRIADS{}{}').format(
                 self.n_global,
                 string_nodes,
@@ -308,8 +416,50 @@ def Beam3k(**kwargs_class):
     def create_class(**kwargs):
         """
         The function that will be returned. This function should behave like
-        the call to the __init__ function of the class. 
+        the call to the __init__ function of the class.
         """
         return Beam3kClass(**kwargs_class, **kwargs)
 
     return create_class
+
+
+class Beam3eb(Beam):
+    """Represents a Euler Bernoulli beam element."""
+
+    nodes_create = [
+        [-1, True, False],
+        [1, True, False]
+        ]
+    beam_type = mpy.beam.euler_bernoulli
+    valid_material = [MaterialEulerBernoulli, BaseMeshItem]
+
+    def _get_dat(self):
+        """ Return the line for the input file. """
+
+        # The two rotations must be the same and the x1 vector must point from
+        # the start point to the end point.
+        if (not self.nodes[0].rotation == self.nodes[1].rotation):
+            raise ValueError('The two nodal rotations in Euler Bernoulli ' +
+                'beams must be the same, i.e. the beam has to be straight!')
+        direction = self.nodes[1].coordinates - self.nodes[0].coordinates
+        t1 = self.nodes[0].rotation * [1, 0, 0]
+        if (np.linalg.norm(direction / np.linalg.norm(direction) - t1)
+                >= mpy.eps_pos):
+            raise ValueError('The rotations do not match the direction of '
+                + 'the Euler Bernoulli beam!')
+
+        string_nodes = ''
+        string_triads = ''
+        for i in [0, 1]:
+            node = self.nodes[i]
+            string_nodes += '{} '.format(node.n_global)
+            string_triads += ' ' + node.rotation.get_dat()
+
+        # Check the material.
+        self._check_material()
+
+        return '{} BEAM3EB LINE2 {}MAT {}'.format(
+            self.n_global,
+            string_nodes,
+            self.material.n_global
+            )

@@ -1,8 +1,12 @@
 # general filetypes to ignorer
 *.pyc
+.*
 
 # test file in root folder
 /test.py
+
+# coverage report
+*/htmlcov/*
 
 # eclipse stuff
 *.project
@@ -20,8 +24,8 @@
 */build
 */cython_build
 meshpy/meshpy
-*/find_close_nodes.c
-*/find_close_nodes.html
+*/find_close_points.c
+*/find_close_points.html
 
 # C++ folders
 /meshpy/cpp/build
@@ -29,3 +33,10 @@ meshpy/meshpy
 # AceGen stuff
 */rotation_matrix.cpp
 */AceShare
+
+# Website stuff
+_site
+.sass-cache
+.jekyll-metadata
+*.lock
+website/public/

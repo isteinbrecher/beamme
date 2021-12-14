@@ -1,17 +1,45 @@
 # -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------
+# MeshPy: A beam finite element input generator
+#
+# MIT License
+#
+# Copyright (c) 2021 Ivo Steinbrecher
+#                    Institute for Mathematics and Computer-Based Simulation
+#                    Universitaet der Bundeswehr Muenchen
+#                    https://www.unibw.de/imcs-en
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# -----------------------------------------------------------------------------
 """
 This module implements the class that represents one element in the Mesh.
 """
 
 # Meshpy modules.
-from . import BaseMeshItem
+from .base_mesh_item import BaseMeshItem
 
 
 class Element(BaseMeshItem):
     """A base class for an FEM element in the mesh."""
 
     def __init__(self, nodes=None, material=None, is_dat=False, **kwargs):
-        BaseMeshItem.__init__(self, data=None, is_dat=is_dat, **kwargs)
+        super().__init__(data=None, is_dat=is_dat, **kwargs)
 
         # List of nodes that are connected to the element.
         if nodes is None:
@@ -22,6 +50,9 @@ class Element(BaseMeshItem):
         # Material of this element.
         self.material = material
 
+        # VTK cell data for this element.
+        self.vtk_cell_data = {}
+
     @classmethod
     def from_dat(cls, input_line):
         """
@@ -31,8 +62,8 @@ class Element(BaseMeshItem):
         """
 
         # Import solid element classes for creation of the element.
-        from . import SolidHEX8, SolidRigidSphere, SolidHEX27, SolidHEX20, \
-            SolidTET10, SolidTET4
+        from .element_volume import (VolumeHEX8, SolidRigidSphere, VolumeHEX27,
+            VolumeHEX20, VolumeTET10, VolumeTET4)
 
         # Split up input line and get pre node string.
         line_split = input_line[0].split()
@@ -55,19 +86,19 @@ class Element(BaseMeshItem):
         # Depending on the number of nodes chose which solid element to return.
         n_nodes = len(element_nodes)
         if n_nodes == 8:
-            return SolidHEX8(nodes=element_nodes, dat_pre_nodes=dat_pre_nodes,
+            return VolumeHEX8(nodes=element_nodes, dat_pre_nodes=dat_pre_nodes,
                 dat_post_nodes=dat_post_nodes, comments=input_line[1])
         elif len(element_nodes) == 4:
-            return SolidTET4(nodes=element_nodes, dat_pre_nodes=dat_pre_nodes,
+            return VolumeTET4(nodes=element_nodes, dat_pre_nodes=dat_pre_nodes,
                 dat_post_nodes=dat_post_nodes, comments=input_line[1])
         elif len(element_nodes) == 10:
-            return SolidTET10(nodes=element_nodes, dat_pre_nodes=dat_pre_nodes,
+            return VolumeTET10(nodes=element_nodes, dat_pre_nodes=dat_pre_nodes,
                 dat_post_nodes=dat_post_nodes, comments=input_line[1])
         elif len(element_nodes) == 20:
-            return SolidHEX20(nodes=element_nodes, dat_pre_nodes=dat_pre_nodes,
+            return VolumeHEX20(nodes=element_nodes, dat_pre_nodes=dat_pre_nodes,
                 dat_post_nodes=dat_post_nodes, comments=input_line[1])
         elif len(element_nodes) == 27:
-            return SolidHEX27(nodes=element_nodes, dat_pre_nodes=dat_pre_nodes,
+            return VolumeHEX27(nodes=element_nodes, dat_pre_nodes=dat_pre_nodes,
                 dat_post_nodes=dat_post_nodes, comments=input_line[1])
         elif len(element_nodes) == 1:
             return SolidRigidSphere(nodes=element_nodes,

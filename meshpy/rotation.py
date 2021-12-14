@@ -1,22 +1,62 @@
 # -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------
+# MeshPy: A beam finite element input generator
+#
+# MIT License
+#
+# Copyright (c) 2021 Ivo Steinbrecher
+#                    Institute for Mathematics and Computer-Based Simulation
+#                    Universitaet der Bundeswehr Muenchen
+#                    https://www.unibw.de/imcs-en
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# -----------------------------------------------------------------------------
 """
 This module defines a class that represents a rotation in 3D.
 """
 
 # Python modules.
 import numpy as np
+
+# Meshpy modules.
 from . import mpy
 
 
 class Rotation(object):
     """
     A class that represents a rotation of a coordinate system.
-    The internal parameters are the unit vector n and the rotation angle phi.
+    Internally the rotations are stored as quaternions.
     """
 
     def __init__(self, *args):
         """
-        The default constructor is from an rotation vector n and an angle phi.
+        Initialize the rotation object.
+
+        Args
+        ----
+        *args:
+            - Rotation()
+                Create a identity rotation.
+            - Rotation(axis, phi)
+                Create a rotation around the vector axis with the angle phi.
+            - Rotation([q0, q1, q2, q3])
+                Create a rotation with the quaternion values q0...q3.
         """
 
         self.q = np.zeros(4)
@@ -111,6 +151,11 @@ class Rotation(object):
         else:
             return cls(rotation_vector, phi)
 
+    def check(self):
+        """Perform all checks for the rotation."""
+        self.check_uniqueness()
+        self.check_quaternion_constraint()
+
     def check_uniqueness(self):
         """
         We always want q0 to be positive -> the range for the rotational angle
@@ -165,8 +210,7 @@ class Rotation(object):
         Return the rotation vector for this object.
         """
 
-        self.check_uniqueness()
-        self.check_quaternion_constraint()
+        self.check()
 
         norm = np.linalg.norm(self.q[1:])
         phi = 2 * np.arctan2(norm, self.q[0])
@@ -253,6 +297,7 @@ class Rotation(object):
         String representation of object.
         """
 
+        self.check()
         return 'Rotation:\n    q0: {}\n    q: {}'.format(
             str(self.q[0]),
             str(self.q[1:])

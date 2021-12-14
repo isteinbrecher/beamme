@@ -1,4 +1,32 @@
 # -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------
+# MeshPy: A beam finite element input generator
+#
+# MIT License
+#
+# Copyright (c) 2021 Ivo Steinbrecher
+#                    Institute for Mathematics and Computer-Based Simulation
+#                    Universitaet der Bundeswehr Muenchen
+#                    https://www.unibw.de/imcs-en
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# -----------------------------------------------------------------------------
 """
 This script is used to test the functionality of the Rotation class in the
 meshpy module.
@@ -9,7 +37,8 @@ import unittest
 import numpy as np
 
 # Meshpy imports.
-from meshpy import mpy, Rotation, get_relative_rotation
+from meshpy import mpy, Rotation
+from meshpy.rotation import get_relative_rotation
 
 
 class TestRotation(unittest.TestCase):
@@ -17,7 +46,7 @@ class TestRotation(unittest.TestCase):
 
     def rotation_matrix(self, axis, alpha):
         """
-        Create a rotation about one of the cartesian axis.
+        Create a rotation about one of the Cartesian axis.
 
         Args
         ----
@@ -68,7 +97,7 @@ class TestRotation(unittest.TestCase):
                 0.)
 
     def test_euler_angles(self):
-        """Create a rotation with euler angles and compare to known results."""
+        """Create a rotation with Euler angles and compare to known results."""
 
         # Set default values for global parameters.
         mpy.set_default_values()
@@ -240,3 +269,8 @@ class TestRotation(unittest.TestCase):
                 'test_rotation_matrix: compare t1')
             self.assertLess(np.linalg.norm(t2 - t2_rot), mpy.eps_quaternion,
                 'test_rotation_matrix: compare t2')
+
+
+if __name__ == '__main__':
+    # Execution part of script.
+    unittest.main()

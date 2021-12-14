@@ -1,12 +1,40 @@
 # -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------
+# MeshPy: A beam finite element input generator
+#
+# MIT License
+#
+# Copyright (c) 2021 Ivo Steinbrecher
+#                    Institute for Mathematics and Computer-Based Simulation
+#                    Universitaet der Bundeswehr Muenchen
+#                    https://www.unibw.de/imcs-en
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# -----------------------------------------------------------------------------
 """
 This function creates the code for the definition of the geometry in unit
 tests.
 """
 
 # Meshpy modules.
-from .. import Beam, SolidElement, SolidHEX8, SolidHEX20, SolidHEX27, \
-    SolidTET4, SolidTET10
+from .. import Beam, VolumeElement, VolumeHEX8, VolumeHEX20, VolumeHEX27, \
+    VolumeTET4, VolumeTET10
 
 
 def get_unit_test_code(mesh, function_name):
@@ -75,7 +103,7 @@ def get_unit_test_code(mesh, function_name):
 
     # Loop over solid elements.
     for i, element in enumerate([element for element in mesh.elements if
-            isinstance(element, SolidElement)]):
+            isinstance(element, VolumeElement)]):
 
         # Number of nodes for this element.
         n_nodes = len(element.nodes)
@@ -88,15 +116,15 @@ def get_unit_test_code(mesh, function_name):
             list_function_definition.append('std::vector<Teuchos::RCP<GEOMETRYPAIR::GeometryPairLineToVolumeSegmentation<double, 2, 2, {}, 1>>>& geometry_pairs'.format(n_nodes))
 
         # Add the element.
-        if isinstance(element, SolidHEX8):
+        if isinstance(element, VolumeHEX8):
             list_solid_elements.append('volume_elements.push_back(Teuchos::rcp(new DRT::ELEMENTS::So_hex8({}, 0)));'.format(element_counter))
-        elif isinstance(element, SolidHEX20):
+        elif isinstance(element, VolumeHEX20):
             list_solid_elements.append('volume_elements.push_back(Teuchos::rcp(new DRT::ELEMENTS::So_hex20({}, 0)));'.format(element_counter))
-        elif isinstance(element, SolidHEX27):
+        elif isinstance(element, VolumeHEX27):
             list_solid_elements.append('volume_elements.push_back(Teuchos::rcp(new DRT::ELEMENTS::So_hex27({}, 0)));'.format(element_counter))
-        elif isinstance(element, SolidTET4):
+        elif isinstance(element, VolumeTET4):
             list_solid_elements.append('volume_elements.push_back(Teuchos::rcp(new DRT::ELEMENTS::So_tet4({}, 0)));'.format(element_counter))
-        elif isinstance(element, SolidTET10):
+        elif isinstance(element, VolumeTET10):
             list_solid_elements.append('volume_elements.push_back(Teuchos::rcp(new DRT::ELEMENTS::So_tet10({}, 0)));'.format(element_counter))
         else:
             raise TypeError('Element type not implemented!')

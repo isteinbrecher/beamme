@@ -1,4 +1,32 @@
 # -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------
+# MeshPy: A beam finite element input generator
+#
+# MIT License
+#
+# Copyright (c) 2021 Ivo Steinbrecher
+#                    Institute for Mathematics and Computer-Based Simulation
+#                    Universitaet der Bundeswehr Muenchen
+#                    https://www.unibw.de/imcs-en
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# -----------------------------------------------------------------------------
 """
 This module defines the Mesh class, which holds the content (nodes, elements,
 sets, ...) for a meshed geometry.
@@ -7,15 +35,24 @@ sets, ...) for a meshed geometry.
 # Python modules.
 import numpy as np
 import os
-from _collections import OrderedDict
 import warnings
 import copy
 
 # Meshpy modules.
-from . import mpy, Rotation, Function, Material, Node, Element, \
-    GeometryName, GeometrySet, GeometrySetContainer, BoundaryCondition, \
-    Coupling, BoundaryConditionContainer, get_close_nodes, VTKWriter, \
-    add_rotations, find_close_nodes
+from .conf import mpy
+from .rotation import Rotation, add_rotations
+from .function import Function
+from .material import Material
+from .node import Node
+from .element_beam import Beam
+from .geometry_set import GeometrySet
+from .container import (GeometryName, GeometrySetContainer,
+    BoundaryConditionContainer)
+from .boundary_condition import BoundaryConditionBase
+from .coupling import Coupling
+from .vtk_writer import VTKWriter
+from .utility import (find_close_points, find_close_nodes,
+    partner_indices_to_point_partners)
 
 
 class Mesh(object):
@@ -29,9 +66,9 @@ class Mesh(object):
 
         self.nodes = []
         self.elements = []
+        self.elements_fluid = []
         self.materials = []
         self.functions = []
-        self.couplings = []
         self.geometry_sets = GeometrySetContainer()
         self.boundary_conditions = BoundaryConditionContainer()
 
@@ -51,20 +88,18 @@ class Mesh(object):
                 self.add_mesh(add_item, **kwargs)
             elif isinstance(add_item, Function):
                 self.add_function(add_item, **kwargs)
-            elif isinstance(add_item, BoundaryCondition):
+            elif isinstance(add_item, BoundaryConditionBase):
                 self.add_bc(add_item, **kwargs)
             elif isinstance(add_item, Material):
                 self.add_material(add_item, **kwargs)
             elif isinstance(add_item, Node):
                 self.add_node(add_item, **kwargs)
-            elif isinstance(add_item, Element):
+            elif isinstance(add_item, Beam):
                 self.add_element(add_item, **kwargs)
             elif isinstance(add_item, GeometrySet):
                 self.add_geometry_set(add_item, **kwargs)
             elif isinstance(add_item, GeometryName):
                 self.add_geometry_name(add_item, **kwargs)
-            elif isinstance(add_item, Coupling):
-                self.add_coupling(add_item, **kwargs)
             elif isinstance(add_item, list):
                 for item in add_item:
                     self.add(item, **kwargs)
@@ -85,17 +120,10 @@ class Mesh(object):
         self.add(mesh.elements)
         self.add(mesh.materials)
         self.add(mesh.functions)
-        self.add(mesh.couplings)
         for key in self.geometry_sets.keys():
             self.add(mesh.geometry_sets[key])
         for key in self.boundary_conditions.keys():
             self.add(mesh.boundary_conditions[key])
-
-    def add_coupling(self, coupling):
-        """Add a coupling to the mesh object."""
-        if coupling in self.couplings:
-            raise ValueError('The coupling element is already in this mesh!')
-        self.couplings.append(coupling)
 
     def add_bc(self, bc):
         """Add a boundary condition to this mesh."""
@@ -161,13 +189,18 @@ class Mesh(object):
             raise ValueError('The node that should be replaced is not in the '
                 + 'mesh')
 
-    def get_unique_geometry_sets(self, link_nodes=False):
+    def get_unique_geometry_sets(self, coupling_sets=True, link_nodes=False):
         """
-        Return a geometry set container that contains all geometry sets
-        explicitly added to the mesh, as well as all sets from boundary
-        conditions and couplings.
-        After all the sets are gathered, each sets tells its nodes that they
-        are part of the set (mainly for vtk output).
+        Return a geometry set container that contains geometry sets explicitly
+        added to the mesh, as well as sets for boundary conditions.
+
+        Args
+        ----
+        coupling_sets: bool
+            If this is true, also sets for couplings will be added.
+        link_nodes: bool
+            If a link to the geometry sets should be added to each connected
+            node (this option is mainly for vtk output).
         """
 
         if link_nodes:
@@ -178,19 +211,20 @@ class Mesh(object):
         # Make a copy of the sets in this mesh.
         mesh_sets = self.geometry_sets.copy()
 
-        # Add sets from boundary conditions and couplings.
-        for (_bc_key, geom_key), bc_list in self.boundary_conditions.items():
+        # Add sets from boundary conditions.
+        for (bc_key, geom_key), bc_list in self.boundary_conditions.items():
             for bc in bc_list:
                 if not bc.is_dat:
-                    mesh_sets[geom_key].append(bc.geometry_set)
-        for coupling in self.couplings:
-            mesh_sets[coupling.node_set.geometry_type].append(
-                coupling.node_set)
+                    # Check if sets from couplings should be added.
+                    if ((bc_key == mpy.bc.point_coupling and coupling_sets)
+                            or not bc_key == mpy.bc.point_coupling):
+                        # Only add set if it is not already in the container.
+                        # For example if multiple Neumann boundary conditions
+                        # are applied on the same node set.
+                        if bc.geometry_set not in mesh_sets[geom_key]:
+                            mesh_sets[geom_key].append(bc.geometry_set)
 
         for key in mesh_sets.keys():
-            # Remove double node sets in the container.
-            mesh_sets[key] = list(OrderedDict.fromkeys(mesh_sets[key]))
-
             for i, geometry_set in enumerate(mesh_sets[key]):
                 # Add global indices to the geometry set.
                 geometry_set.n_global = i + 1
@@ -228,62 +262,112 @@ class Mesh(object):
 
         # Add a link to the couplings. For now the implementation only allows
         # one coupling per node.
-        for coupling in self.couplings:
-            for node in coupling.node_set.nodes:
-                if node.coupling_link is None:
-                    node.coupling_link = coupling
-                else:
-                    raise ValueError('It is currently not possible to add more'
-                        + ' than one coupling to a node.')
+        for coupling in self.boundary_conditions[
+                mpy.bc.point_coupling, mpy.geo.point]:
+            if not coupling.is_dat:
+                for node in coupling.geometry_set.nodes:
+                    if node.coupling_link is None:
+                        node.coupling_link = coupling
+                    else:
+                        raise ValueError('It is currently not possible to add '
+                            + 'more than one coupling to a node.')
 
-    def get_global_coordinates(self, nodes=None):
+    def get_global_nodes(self, *, nodes=None, include_solid_nodes=False,
+            middle_nodes=True):
         """
-        Return an array with the coordinates of all nodes.
+        Return a list with the global beam nodes. If in the future we also want
+        to perform translate / rotate / cylinder wrapping / ... on solid
+        elements this can be implemented here.
 
         Args
         ----
         nodes: list(Nodes)
-            If this one is given return an array with the coordinates of the
-            nodes in list, otherwise of all nodes in the mesh.
+            If this list is given it will be returned as is.
+        include_solid_nodes: bool
+            If solid nodes should be included. This only works if the solid
+            mesh is imported as a full mesh and not just the lines in the input
+            file.
+        middle_nodes: bool
+            If middle nodes should be returned or not.
         """
+
         if nodes is None:
             node_list = self.nodes
         else:
             node_list = nodes
-        pos = np.zeros([len(node_list), 3])
-        for i, node in enumerate(node_list):
-            if not node.is_dat:
-                pos[i, :] = node.coordinates
-            else:
-                pos[i, :] = [1, 0, 0]
-        return pos
+        return [node for node in node_list if
+            (include_solid_nodes or not node.is_dat) and
+            (middle_nodes or not node.is_middle_node)
+            ]
 
-    def get_global_quaternions(self):
-        """Return an array with the quaternions of all nodes."""
-        rot = np.zeros([len(self.nodes), 4])
-        for i, node in enumerate(self.nodes):
-            if (not node.is_dat) and (node.rotation is not None):
+    def get_global_coordinates(self, **kwargs):
+        """
+        Return an array with the coordinates of some nodes. As well as a list
+        with the corresponding nodes.
+
+        Args
+        ----
+        kwargs:
+            Will be passed to sefl.get_global_nodes.
+
+        Return
+        ----
+        pos: np.array
+            Numpy array with all the positions of the nodes.
+        beam_nodes: [Node]
+            List of the nodes corresponding to the rows in the pos array. If
+            the input argument nodes was given, it will be returned as is.
+        """
+        beam_nodes = self.get_global_nodes(**kwargs)
+        pos = np.zeros([len(beam_nodes), 3])
+        for i, node in enumerate(beam_nodes):
+            pos[i, :] = node.coordinates
+        return pos, beam_nodes
+
+    def get_global_quaternions(self, **kwargs):
+        """
+        Return an array with the quaternions of some beam nodes. As well as a
+        list with the corresponding nodes.
+
+        Args
+        ----
+        kwargs:
+            Will be passed to sefl.get_global_nodes.
+
+        Return
+        ----
+        rot: np.array
+            Numpy array with all the quaternions of the nodes.
+        beam_nodes: [Node]
+            List of the nodes corresponding to the rows in the rot array. If
+            the input argument nodes was given, it will be returned as is.
+        """
+        beam_nodes = self.get_global_nodes(**kwargs)
+        rot = np.zeros([len(beam_nodes), 4])
+        for i, node in enumerate(beam_nodes):
+            if node.rotation is not None:
                 rot[i, :] = node.rotation.get_quaternion()
             else:
-                rot[i, 0] = 1
-        return rot
+                raise ValueError('Got a node without rotation, this should not'
+                    + ' happen here!')
+        return rot, beam_nodes
 
     def translate(self, vector):
         """
-        Translate all nodes of this mesh.
+        Translate all beam nodes of this mesh.
 
         Args
         ----
         vector: np.array, list
             3D vector that will be added to all nodes.
         """
-        for node in self.nodes:
-            if not node.is_dat:
-                node.coordinates += vector
+        beam_nodes = self.get_global_nodes()
+        for node in beam_nodes:
+            node.coordinates += vector
 
     def rotate(self, rotation, origin=None, only_rotate_triads=False):
         """
-        Rotate all nodes of the mesh with rotation.
+        Rotate all beam nodes of the mesh with rotation.
 
         Args
         ----
@@ -298,7 +382,7 @@ class Mesh(object):
         """
 
         # Get array with all quaternions for the nodes.
-        rot1 = self.get_global_quaternions()
+        rot1, beam_nodes = self.get_global_quaternions()
 
         # Additional rotation.
         rotnew = add_rotations(rotation, rot1)
@@ -310,7 +394,7 @@ class Mesh(object):
                 rot2 = rotation
 
             # Get array with all positions for the nodes.
-            pos = self.get_global_coordinates()
+            pos, _beam_nodes = self.get_global_coordinates(nodes=beam_nodes)
 
             # Check if origin has to be added.
             if origin is not None:
@@ -346,12 +430,11 @@ class Mesh(object):
             if origin is not None:
                 posnew += origin
 
-        for i, node in enumerate(self.nodes):
-            if not node.is_dat:
-                if node.rotation is not None:
-                    node.rotation.q = rotnew[i, :]
-                if not only_rotate_triads:
-                    node.coordinates = posnew[i, :]
+        for i, node in enumerate(beam_nodes):
+            if node.rotation is not None:
+                node.rotation.q = rotnew[i, :]
+            if not only_rotate_triads:
+                node.coordinates = posnew[i, :]
 
     def reflect(self, normal_vector, origin=None, flip=False):
         """
@@ -387,8 +470,8 @@ class Mesh(object):
         normal_vector = np.array(normal_vector / np.linalg.norm(normal_vector))
 
         # Get array with all quaternions and positions for the nodes.
-        pos = self.get_global_coordinates()
-        rot1 = self.get_global_quaternions()
+        pos, beam_nodes = self.get_global_coordinates()
+        rot1, _beam_nodes = self.get_global_quaternions(nodes=beam_nodes)
 
         # Check if origin has to be added.
         if origin is not None:
@@ -433,16 +516,14 @@ class Mesh(object):
                 element.flip()
 
         # Set the new positions and rotations.
-        for i, node in enumerate(self.nodes):
-            if not node.is_dat:
-                node.coordinates = pos_new[i, :]
-                if node.rotation is not None:
-                    node.rotation.q = rot_new[i, :]
+        for i, node in enumerate(beam_nodes):
+            node.coordinates = pos_new[i, :]
+            node.rotation.q = rot_new[i, :]
 
-    def wrap_around_cylinder(self, radius=None):
+    def wrap_around_cylinder(self, radius=None, advanced_warning=True):
         """
         Wrap the geometry around a cylinder. The y-z plane gets morphed into
-        the axis of symmetry. If all nodes are on the same y-z plane, the
+        the z-axis of symmetry. If all nodes are on the same y-z plane, the
         radius of the created cylinder is the x coordinate of that plane. If
         the nodes are not on the same y-z plane, the radius has to be given
         explicitly.
@@ -452,11 +533,15 @@ class Mesh(object):
         radius: double
             If this value is given AND not all nodes are on the same y-z plane,
             then use this radius for the calculation of phi for all nodes.
-            This will still lead to distorted elements!.
+            This might still lead to distorted elements!.
+        advanced_warning: bool
+            If each element should be checked if it is either parallel to the
+            y-z or x-z plane. This is computationally expensive, but in most
+            cases (up to 100,000 elements) this check can be left activated.
         """
 
-        pos = self.get_global_coordinates()
-        quaternions = np.zeros([len(self.nodes), 4])
+        pos, beam_nodes = self.get_global_coordinates()
+        quaternions = np.zeros([len(beam_nodes), 4])
 
         # The x coordinate is the radius, the y coordinate the arc length.
         points_x = pos[:, 0].copy()
@@ -466,21 +551,43 @@ class Mesh(object):
             # The points are not all on the y-z plane, get the reference
             # radius.
             if radius is not None:
-                warnings.warn('The nodes are not on the same y-z plane. This '
-                    + 'will lead to distorted elements!')
+                if advanced_warning:
+                    # Here we check, if each element lays on a plane parallel
+                    # to the y-z plane, or parallel to the x-z plane.
+                    #
+                    # To be exactly sure, we could check the rotations here,
+                    # i.e. if they are also in plane.
+                    element_warning = []
+                    for i_element, element in enumerate(
+                            [e for e in self.elements if not e.is_dat]):
+                        element_coordinates = np.zeros([len(element.nodes), 3])
+                        for i_node, node in enumerate(element.nodes):
+                            element_coordinates[i_node, :] = node.coordinates
+                        is_yz = np.max(np.abs(element_coordinates[:, 0]
+                            - element_coordinates[0, 0])) < mpy.eps_pos
+                        is_xz = np.max(np.abs(element_coordinates[:, 1]
+                            - element_coordinates[0, 1])) < mpy.eps_pos
+                        if not(is_yz or is_xz):
+                            element_warning.append(i_element)
+                    if len(element_warning) != 0:
+                        warnings.warn('There are elements which are not '
+                            'parallel to the y-z or x-y plane. This will lead '
+                            'to distorted elements!')
+                else:
+                    warnings.warn('The nodes are not on the same y-z plane. '
+                        'This may lead to distorted elements!')
             else:
                 raise ValueError('The nodes that should be wrapped around a '
                     + 'cylinder are not on the same y-z plane. This will give '
                     + 'unexpected results. Give a reference radius!')
             radius_phi = radius
             radius_points = points_x
-        else:
-            # The points are on the same y-z plane. Check that the radius is
-            # not given (does not make sense).
-            if radius is not None:
-                raise ValueError('Points are all on the same plane, but a '
-                    + 'radius is given. This input does not make sense!')
+        elif radius is None or np.abs(points_x[0] - radius) < mpy.eps_pos:
             radius_points = radius_phi = points_x[0]
+        else:
+            raise ValueError(('The points are all on the same y-z plane with '
+                + 'the x-coordinate {} but the given radius {} is different. '
+                + 'This does not make sense.').format(points_x[0], radius))
 
         # Get the angle for all nodes.
         phi = pos[:, 1] / radius_phi
@@ -497,9 +604,8 @@ class Mesh(object):
         self.rotate(quaternions, only_rotate_triads=True)
 
         # Set the new position for the nodes.
-        for i, node in enumerate(self.nodes):
-            if not node.is_dat:
-                node.coordinates = pos[i, :]
+        for i, node in enumerate(beam_nodes):
+            node.coordinates = pos[i, :]
 
     def couple_nodes(self, *, nodes=None, coupling_type=mpy.coupling.fix):
         """
@@ -519,9 +625,10 @@ class Mesh(object):
             mpy.coupling_joint: Fix all positional DOFs of the nodes together.
         """
 
-        # Get list of partner nodes
-        partner_nodes = self.get_close_nodes(nodes=nodes)
-
+        # Get the nodes that should be checked for coupling. Middle nodes are
+        # not checked, as coupling can only be applied to the boundary nodes.
+        node_list = self.get_global_nodes(nodes=nodes, middle_nodes=False)
+        partner_nodes = find_close_nodes(node_list)
         if len(partner_nodes) == 0:
             # If no partner nodes were found, end this function.
             return
@@ -545,17 +652,19 @@ class Mesh(object):
 
                 # Abuse the find close nodes function to find nodes with the
                 # same rotation.
-                has_partner, n_partner = find_close_nodes(rotation_vectors,
-                    eps=mpy.eps_quaternion)
+                rot_partner_indices = find_close_points(rotation_vectors,
+                    binning=False, eps=mpy.eps_quaternion)
+                has_partner, n_partners = partner_indices_to_point_partners(
+                    rot_partner_indices, len(node_list))
 
                 # Check if nodes with the same rotations were found.
-                if n_partner == 0:
+                if len(rot_partner_indices) == 0:
                     self.add(Coupling(node_list, mpy.coupling.fix))
                 else:
                     # There are nodes that need to be combined.
                     combining_nodes = []
                     coupling_nodes = []
-                    found_partner_id = [None for _i in range(n_partner)]
+                    found_partner_id = [None for _i in range(n_partners)]
 
                     # Add the nodes that need to be combined and add the nodes
                     # that will be coupled.
@@ -602,24 +711,20 @@ class Mesh(object):
             if not node.is_dat:
                 node.unlink()
 
-    def get_nodes_by_function(self, function, *args, middle_nodes=False):
+    def get_nodes_by_function(self, function, *args, middle_nodes=False,
+            **kwargs):
         """
         Return all nodes for which the function evaluates to true.
 
         Args
         ----
-        function: function(node)
+        function: function(node, *args)
             Nodes for which this function is true are returned.
         middle_nodes: bool
             If this is true, middle nodes of a beam are also returned.
         """
-
-        node_list = []
-        for node in self.nodes:
-            if middle_nodes or (not node.is_middle_node):
-                if function(node, *args):
-                    node_list.append(node)
-        return node_list
+        node_list = self.get_global_nodes(middle_nodes=middle_nodes)
+        return [node for node in node_list if function(node, *args, **kwargs)]
 
     def get_min_max_nodes(self, nodes=None):
         """
@@ -634,11 +739,7 @@ class Mesh(object):
 
         geometry = GeometryName()
 
-        if nodes is None:
-            node_list = self.nodes
-        else:
-            node_list = nodes
-        pos = self.get_global_coordinates(nodes=node_list)
+        pos, beam_nodes = self.get_global_coordinates(nodes=nodes)
         for i, direction in enumerate(['x', 'y', 'z']):
             # Check if there is more than one value in dimension.
             min_max = [np.min(pos[:, i]), np.max(pos[:, i])]
@@ -650,42 +751,49 @@ class Mesh(object):
                             np.abs(pos[:, i] - min_max[j]) < mpy.eps_pos
                             ):
                         if value:
-                            min_max_nodes.append(node_list[index])
+                            min_max_nodes.append(beam_nodes[index])
                     geometry['{}_{}'.format(direction, text)] = GeometrySet(
                         mpy.geo.point,
                         min_max_nodes
                         )
         return geometry
 
-    def get_close_nodes(self, nodes=None, **kwargs):
+    def check_overlapping_elements(self, raise_error=True):
         """
-        Find nodes that are close to each other.
-
-        Args
-        ----
-        nodes: list(Node), str
-            If this argument is given, the closest nodes within this list are
-            returned, otherwise all nodes in the mesh are checked.
-            If nodes == 'all' use all nodes of the mesh.
-        kwargs:
-            Keyword arguments for get_close_nodes.
-
-        Return
-        ----
-        partner_nodes: list(list(Node))
-            A list of lists with partner nodes.
+        Check if there are overlapping elements in the mesh. This is done by
+        checking if all middle nodes of beam elements have unique coordinates
+        in the mesh.
         """
 
-        # Check if input argument was given
-        if nodes is None:
-            node_list = [node for node in self.nodes if (not node.is_dat
-                and not node.is_middle_node)]
-        elif nodes is 'all':
-            node_list = self.nodes
-        else:
-            node_list = nodes
+        # Number of middle nodes.
+        middle_nodes = [node for node in self.nodes if
+            (not node.is_dat) and node.is_middle_node]
 
-        return get_close_nodes(node_list, **kwargs)
+        # Only check if there are middle nodes.
+        if len(middle_nodes) == 0:
+            return
+
+        # Get array with middle nodes.
+        coordinates = np.zeros([len(middle_nodes), 3])
+        for i, node in enumerate(middle_nodes):
+            coordinates[i, :] = node.coordinates
+
+        # Check if there are double entries in the coordinates.
+        partner_indices = find_close_points(coordinates)
+        if len(partner_indices) > 0:
+            if raise_error:
+                raise ValueError('There are multiple middle nodes with the '
+                    + 'same coordinates. Per default this raises an error! '
+                    + 'This check can be turned of with '
+                    + 'mpy.check_overlapping_elements=False')
+            else:
+                warnings.warn('There are multiple middle nodes with the '
+                        + 'same coordinates!')
+
+            # Add the partner index to the middle nodes.
+            for i_partner, partners in enumerate(partner_indices):
+                for i_node in partners:
+                    middle_nodes[i_node].element_partner_index = i_partner
 
     def preview_python(self):
         """Display the elements in this mesh in matplotlib."""
@@ -704,21 +812,42 @@ class Mesh(object):
                 element.preview_python(ax)
 
         # Finish plot.
-        ax.set_aspect('equal')
+        ax.set_aspect('auto')
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
         plt.show()
 
-    def write_vtk(self, output_name='meshpy', output_directory='', **kwargs):
-        """Write the contents of this mesh to a VTK file."""
+    def write_vtk(self, output_name='meshpy', output_directory='',
+            overlapping_elements=True, coupling_sets=False, **kwargs):
+        """
+        Write the contents of this mesh to VTK files.
+
+        Args
+        ----
+        output_name: str
+            Base name of the output file. There will be a {}_beam.vtu and
+            {}_solid.vtu file.
+        output_directory: path
+            Directory where the output files will be written.
+        overlapping_elements: bool
+            I elements should be checked for overlapping. If they overlap, the
+            output will mark them.
+        coupling_sets: bool
+            If coupling sets should also be displayed.
+        """
 
         # Object to store VKT data and write it to file.
         vtkwriter_beam = VTKWriter()
         vtkwriter_solid = VTKWriter()
 
         # Get the set numbers of the mesh
-        self.get_unique_geometry_sets(link_nodes=True)
+        self.get_unique_geometry_sets(coupling_sets=coupling_sets,
+            link_nodes=True)
+
+        if overlapping_elements:
+            # Check for overlapping elements.
+            self.check_overlapping_elements(raise_error=False)
 
         # Get representation of elements.
         for element in self.elements:
@@ -740,7 +869,7 @@ class Mesh(object):
 
     def create_beam_mesh_function(self, *, beam_object=None, material=None,
             function_generator=None, interval=[0, 1], n_el=1, add_sets=False,
-            start_node=None, end_node=None):
+            start_node=None, end_node=None, vtk_cell_data=None):
         """
         Generic beam creation function.
 
@@ -776,6 +905,10 @@ class Mesh(object):
             If this is a Node or GeometrySet, the last node of the created beam
             is set to that node.
             If it is True the created beam is closed within itself.
+        vtk_cell_data: {cell_data_name (str): cell_data_value (float)}
+            With this argument, a vtk cell data can be set for the elements
+            created within this function. This can be used to check which
+            elements are created by which function.
 
         Return
         ----
@@ -852,6 +985,15 @@ class Mesh(object):
             nodes.extend(element.create_beam(function, start_node=first_node,
                 end_node=last_node))
 
+        # Set vtk cell data on created elements.
+        if vtk_cell_data is not None:
+            for data_name, data_value in vtk_cell_data.items():
+                for element in elements:
+                    if data_name in element.vtk_cell_data.keys():
+                        raise KeyError(('The cell data "{}" '
+                            + 'already exists!').format(data_name))
+                    element.vtk_cell_data[data_name] = data_value
+
         # Add items to the mesh
         self.elements.extend(elements)
         if start_node is None:
@@ -879,7 +1021,7 @@ class Mesh(object):
 
     def copy(self):
         """
-        Return a deep copy of this mesh. The functions and materials wil not be
-        deep copied.
+        Return a deep copy of this mesh. The functions and materials will not
+        be deep copied.
         """
         return copy.deepcopy(self)

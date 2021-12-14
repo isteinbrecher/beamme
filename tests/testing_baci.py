@@ -1,4 +1,32 @@
 # -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------
+# MeshPy: A beam finite element input generator
+#
+# MIT License
+#
+# Copyright (c) 2021 Ivo Steinbrecher
+#                    Institute for Mathematics and Computer-Based Simulation
+#                    Universitaet der Bundeswehr Muenchen
+#                    https://www.unibw.de/imcs-en
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# -----------------------------------------------------------------------------
 """
 This script is used to simulate baci input files created with meshpy.
 """
@@ -17,7 +45,9 @@ from tests.testing_utility import (baci_release, testing_temp, testing_path,
 
 # Meshpy imports.
 from meshpy import (mpy, Rotation, InputFile, InputSection, MaterialReissner,
-    Function, Beam3rHerm2Lin3, BoundaryCondition, Mesh)
+    Function, Beam3rHerm2Line3, BoundaryCondition, Mesh, set_header_static)
+from meshpy.utility_baci import dbc_monitor_to_input
+from testing_utility import compare_strings
 
 # Geometry functions.
 from meshpy.mesh_creation_functions.beam_basic_geometry import (
@@ -39,8 +69,11 @@ class TestFullBaci(unittest.TestCase):
         """
         if baci_release is None:
             self.skipTest('BACI path was not found!')
+        if shutil.which('mpirun') is None:
+            self.skipTest('mpirun was not found!')
 
-    def run_baci_test(self, name, mesh, n_proc=2):
+    def run_baci_test(self, name, mesh, n_proc=2, delete_files=True,
+            restart=None, **kwargs):
         """
         Run Baci with a input file and check the output. If the test passes,
         the created files are deleted.
@@ -53,6 +86,10 @@ class TestFullBaci(unittest.TestCase):
             The InputFile object that contains the simulation.
         n_proc: int
             Number of processors to run Baci on.
+        delete_files: bool
+            If the created files should be deleted.
+        restart: [n_restart, xxx_restart]
+            If the simulation should be a restart.
         """
 
         # Check if temp directory exists.
@@ -60,22 +97,35 @@ class TestFullBaci(unittest.TestCase):
 
         # Create input file.
         input_file = os.path.join(testing_temp, name + '.dat')
-        mesh.write_input_file(input_file)
+        mesh.write_input_file(input_file, add_script_to_header=False,
+            **kwargs)
 
         # Run Baci with the input file.
-        child = subprocess.Popen([
-            'mpirun', '-np', str(n_proc),
-            baci_release,
-            os.path.join(testing_path, input_file),
-            os.path.join(testing_temp, 'xxx_' + name)
-            ], cwd=testing_temp, stdout=subprocess.PIPE)
+        if restart is None:
+            child = subprocess.Popen([
+                'mpirun', '-np', str(n_proc),
+                baci_release,
+                os.path.join(testing_path, input_file),
+                os.path.join(testing_temp, 'xxx_' + name)
+                ], cwd=testing_temp, stdout=subprocess.PIPE)
+        else:
+            child = subprocess.Popen([
+                'mpirun', '-np', str(n_proc),
+                baci_release,
+                os.path.join(testing_path, input_file),
+                os.path.join(testing_temp, 'xxx_' + name),
+                'restart={}'.format(restart[0]),
+                'restartfrom={}'.format(restart[1])
+                ], cwd=testing_temp, stdout=subprocess.PIPE)
         child.communicate()[0]
         self.assertEqual(0, child.returncode,
             msg='Test {} failed!'.format(name))
 
         # If successful delete created files directory.
-        if int(child.returncode) == 0:
+        if int(child.returncode) == 0 and delete_files:
             os.remove(input_file)
+            if mesh._nox_xml_file is not None:
+                os.remove(os.path.join(testing_temp, mesh._nox_xml_file))
             items = glob.glob(testing_temp + '/xxx_' + name + '*')
             for item in items:
                 if os.path.isdir(item):
@@ -149,7 +199,7 @@ class TestFullBaci(unittest.TestCase):
         # Create the honeycomb mesh.
         mesh_honeycomb = Mesh()
         honeycomb_set = create_beam_mesh_honeycomb(mesh_honeycomb,
-            Beam3rHerm2Lin3, material, 50.0, 10, 4, n_el=1, closed_top=False,
+            Beam3rHerm2Line3, material, 50.0, 10, 4, n_el=1, closed_top=False,
             add_sets=True)
         mesh_honeycomb.rotate(Rotation([0, 0, 1], 0.5 * np.pi))
 
@@ -201,7 +251,8 @@ class TestFullBaci(unittest.TestCase):
         input_file = InputFile(
             maintainer='Ivo Steinbrecher',
             description='Solid tube with beam tube')
-        input_file.read_dat(os.path.join(testing_input, 'baci_input_tube.dat'))
+        input_file.read_dat(os.path.join(testing_input,
+            'baci_input_solid_tube.dat'))
 
         # Add options for beam_output.
         input_file.add(InputSection(
@@ -225,23 +276,23 @@ class TestFullBaci(unittest.TestCase):
 
         # Add a straight beam.
         input_file.add(material)
-        cantilever_set = create_beam_mesh_line(input_file, Beam3rHerm2Lin3,
+        cantilever_set = create_beam_mesh_line(input_file, Beam3rHerm2Line3,
             material, [2, 0, -5], [2, 0, 5], n_el=3)
 
         # Add boundary conditions.
         input_file.add(
             BoundaryCondition(
-                cantilever_set['start'],  # bc set
-                'NUMDOF 9 ONOFF 1 1 1 1 1 1 0 0 0 VAL 0 0 0 0 0 0 0 0 0 ' + \
-                'FUNCT 0 0 0 0 0 0 0 0 0',  # bc string
+                cantilever_set['start'],
+                'NUMDOF 9 ONOFF 1 1 1 1 1 1 0 0 0 VAL 0 0 0 0 0 0 0 0 0 ' +
+                'FUNCT 0 0 0 0 0 0 0 0 0',
                 bc_type=mpy.bc.dirichlet
                 )
             )
         input_file.add(
             BoundaryCondition(
-                cantilever_set['end'],  # bc set
-                'NUMDOF 9 ONOFF 1 1 1 1 1 1 0 0 0 VAL 3. 3. 0 0 0 0 0 0 0 ' + \
-                'FUNCT {} {} 0 0 0 0 0 0 0',  # bc string
+                cantilever_set['end'],
+                'NUMDOF 9 ONOFF 1 1 1 1 1 1 0 0 0 VAL 3. 3. 0 0 0 0 0 0 0 ' +
+                'FUNCT {} {} 0 0 0 0 0 0 0',
                 format_replacement=[cos, sin],
                 bc_type=mpy.bc.dirichlet
                 )
@@ -359,7 +410,7 @@ class TestFullBaci(unittest.TestCase):
             for closed_top in [False, True]:
                 mesh.translate(17 * np.array([1, 0, 0]))
                 honeycomb_set = create_beam_mesh_honeycomb(mesh,
-                    Beam3rHerm2Lin3, material, 10, 6, 3, n_el=2,
+                    Beam3rHerm2Line3, material, 10, 6, 3, n_el=2,
                     vertical=vertical, closed_top=closed_top)
                 mesh.add(
                     BoundaryCondition(honeycomb_set['bottom'],
@@ -422,10 +473,9 @@ class TestFullBaci(unittest.TestCase):
             )
 
         # Set header
-        input_file.set_default_header_static(
+        set_header_static(input_file,
             time_step=0.05,
-            n_steps=20,
-            binning_bounding_box=[-10, -10, -10, 10, 10, 10]
+            n_steps=20
             )
 
         # Define linear function over time.
@@ -448,7 +498,7 @@ class TestFullBaci(unittest.TestCase):
             mesh = Mesh()
 
             # Create the first line.
-            set_1 = create_beam_mesh_line(mesh, Beam3rHerm2Lin3, mat,
+            set_1 = create_beam_mesh_line(mesh, Beam3rHerm2Line3, mat,
                 [0, 0, 0], 1. * direction, n_el=3)
 
             if not i == 0:
@@ -463,7 +513,7 @@ class TestFullBaci(unittest.TestCase):
                 start_node = set_1['end']
 
             # Add the second line.
-            set_2 = create_beam_mesh_line(mesh, Beam3rHerm2Lin3, mat,
+            set_2 = create_beam_mesh_line(mesh, Beam3rHerm2Line3, mat,
                 1. * direction,
                 2. * direction,
                 n_el=3, start_node=start_node
@@ -507,3 +557,102 @@ class TestFullBaci(unittest.TestCase):
 
         # Run the input file in Baci.
         self.run_baci_test('rotated_beam_axis', input_file)
+        self.run_baci_test('rotated_beam_axis', input_file,
+            nox_xml_file='xml_name')
+
+    def test_dirichlet_boundary_to_neumann_boundary(self):
+        """
+        First simulate a cantilever beam with Dirichlet boundary conditions and
+        then apply those as Neumann boundaries.
+        """
+
+        def create_model(n_steps):
+            """Create the cantilver model."""
+
+            mpy.set_default_values()
+            input_file = InputFile()
+            set_header_static(input_file, time_step=0.5, n_steps=n_steps)
+            input_file.add('--IO\nOUTPUT_BIN yes\nSTRUCT_DISP yes',
+                option_overwrite=True)
+            ft = Function('COMPONENT 0 FUNCTION t')
+            input_file.add(ft)
+            mat = MaterialReissner(youngs_modulus=100.0, radius=0.1)
+            beam_set = create_beam_mesh_line(input_file, Beam3rHerm2Line3, mat,
+                [0, 0, 0], [2, 0, 0], n_el=10)
+
+            return input_file, beam_set
+
+        # Create and run the initial simulation.
+        initial_simulation, beam_set = create_model(n_steps=2)
+        initial_simulation.add(BoundaryCondition(beam_set['start'],
+            'NUMDOF 9 ONOFF 1 1 1 1 1 1 0 0 0 VAL '
+            + '0 0 0 0 0 0 0 0 0 FUNCT 0 0 0 0 0 0 0 0 0',
+            bc_type=mpy.bc.dirichlet))
+        initial_simulation.add(BoundaryCondition(beam_set['end'],
+            'NUMDOF 9 ONOFF 1 1 1 0 0 0 0 0 0 VAL '
+            + '-0.2 1.5 1 0 0 0 0 0 0 FUNCT 1 1 1 0 0 0 0 0 0 '
+            + 'TAG monitor_reaction',
+            bc_type=mpy.bc.dirichlet))
+        initial_simulation.add('''
+            --IO/MONITOR STRUCTURE DBC
+            PRECISION_FILE         10
+            PRECISION_SCREEN       5
+            FILE_TYPE              csv
+            WRITE_HEADER           yes
+            INTERVAL_STEPS         1
+            ''')
+        self.run_baci_test('dbc_to_nbc_initial',
+            initial_simulation, delete_files=False)
+
+        # Create and run the second simulation.
+        restart_simulation, beam_set = create_model(n_steps=21)
+        restart_simulation.add(BoundaryCondition(beam_set['start'],
+            'NUMDOF 9 ONOFF 1 1 1 1 1 1 0 0 0 VAL '
+            + '0 0 0 0 0 0 0 0 0 FUNCT 0 0 0 0 0 0 0 0 0',
+            bc_type=mpy.bc.dirichlet))
+        function_nbc = Function('''FUNCTION nbc_value
+            VARIABLE 0 NAME nbc_value TYPE linearinterpolation NUMPOINTS 2 '''
+            + 'TIMES 1.0 11.0 VALUES 1.0 0.0')
+        restart_simulation.add(function_nbc)
+        dbc_monitor_to_input(restart_simulation,
+            os.path.join(testing_temp,
+                'xxx_dbc_to_nbc_initial_monitor_dbc/'
+                + 'xxx_dbc_to_nbc_initial_102_monitor_dbc.csv'),
+            n_dof=9,
+            function=function_nbc)
+        restart_simulation.add('''--RESULT DESCRIPTION
+            STRUCTURE DIS structure NODE 21 QUANTITY dispx VALUE -4.09988307566066690e-01 TOLERANCE 1e-10
+            STRUCTURE DIS structure NODE 21 QUANTITY dispy VALUE  9.93075098427816383e-01 TOLERANCE 1e-10
+            STRUCTURE DIS structure NODE 21 QUANTITY dispz VALUE  6.62050065618549843e-01 TOLERANCE 1e-10
+            ''')
+        self.run_baci_test('dbc_to_nbc_restart',
+            restart_simulation,
+            restart=[2, 'xxx_dbc_to_nbc_initial'],
+            delete_files=False)
+
+        # Check the input files.
+        compare_strings(self,
+            'test_dirichlet_boundary_to_neumann_boundary_initial',
+            os.path.join(testing_input,
+                'test_dirichlet_boundary_to_neumann_boundary_initial_reference.dat'),
+            initial_simulation.get_string(header=False))
+        compare_strings(self,
+            'test_dirichlet_boundary_to_neumann_boundary_restart',
+            os.path.join(testing_input,
+                'test_dirichlet_boundary_to_neumann_boundary_restart_reference.dat'),
+            restart_simulation.get_string(header=False))
+
+        # Delete all files from this test.
+        items = []
+        items.extend(glob.glob(testing_temp + '/xxx_dbc_to_nbc_*'))
+        items.extend(glob.glob(testing_temp + '/dbc_to_nbc_*'))
+        for item in items:
+            if os.path.isdir(item):
+                shutil.rmtree(item)
+            else:
+                os.remove(item)
+
+
+if __name__ == '__main__':
+    # Execution part of script.
+    unittest.main()

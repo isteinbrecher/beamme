@@ -1,4 +1,32 @@
 # -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------
+# MeshPy: A beam finite element input generator
+#
+# MIT License
+#
+# Copyright (c) 2021 Ivo Steinbrecher
+#                    Institute for Mathematics and Computer-Based Simulation
+#                    Universitaet der Bundeswehr Muenchen
+#                    https://www.unibw.de/imcs-en
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# -----------------------------------------------------------------------------
 """
 This module provides a class that is used to write VTK files.
 """
@@ -11,7 +39,7 @@ import os
 import warnings
 
 # Meshpy modules.
-from . import mpy
+from .conf import mpy
 
 
 def add_point_data_node_sets(point_data, nodes):
@@ -35,9 +63,9 @@ def add_point_data_node_sets(point_data, nodes):
         data_vector = np.zeros(len(nodes))
         for i, node in enumerate(nodes):
             if geometry_set in node.node_sets_link:
-                data_vector[i] = 1.
+                data_vector[i] = 1
             else:
-                data_vector[i] = 0.
+                data_vector[i] = mpy.vtk_nan_int
 
         # Get the name of the geometry type.
         if geometry_set.geometry_type is mpy.geo.point:
@@ -56,7 +84,31 @@ def add_point_data_node_sets(point_data, nodes):
             geometry_name,
             mpy.vtk_node_set_format.format(geometry_set.n_global)
             )
-        point_data[set_name] = data_vector
+        point_data[set_name] = (data_vector, mpy.vtk_type.int)
+
+
+def _get_data_value_and_type(data):
+    """
+    Return the data and its type if one was given.
+    The default type, if none was given is float.
+    """
+    if type(data) is tuple:
+        return data[0], data[1]
+    else:
+        return data, mpy.vtk_type.float
+
+
+def _get_vtk_array_type(data):
+    """
+    Return the corresponding meshpy type.
+    """
+    data_type = data.GetDataTypeAsString()
+    if data_type == 'int':
+        return mpy.vtk_type.int
+    elif data_type == 'double':
+        return mpy.vtk_type.float
+    else:
+        raise ValueError('Got unexpected type ""!'.format(data_type))
 
 
 class VTKWriter(object):
@@ -74,7 +126,7 @@ class VTKWriter(object):
         # Container for output data.
         self.data = {}
         for key1 in mpy.vtk_geo:
-            for key2 in mpy.vtk_data:
+            for key2 in mpy.vtk_tensor:
                 self.data[key1, key2] = {}
 
     def add_cell(self, cell_type, coordinates, topology=None, cell_data=None,
@@ -109,14 +161,15 @@ class VTKWriter(object):
             if not n_points == len(topology):
                 raise ValueError(('Coordinates is of size {}, '
                         + 'while topology is of size {}!').format(
-                        n_points, len(topology)))
+                            n_points, len(topology)))
 
         # Check if point data containers are of the correct size.
         if point_data is not None:
-            for key, value in point_data.items():
+            for key, item_value in point_data.items():
+                value, _data_type = _get_data_value_and_type(item_value)
                 if not len(value) == n_points:
-                    raise IndexError(('The len of coordinates is {}, the len '
-                        + 'of {} is {}, does not match!').format(
+                    raise IndexError(('The length of coordinates is {},'
+                        + 'the length of {} is {}, does not match!').format(
                             n_points,
                             key,
                             len(value)
@@ -131,22 +184,28 @@ class VTKWriter(object):
                 if input_data is not None]:
 
             # Loop through output fields.
-            for key, value in data_container.items():
+            for key, item_value in data_container.items():
+
+                # Get the data and the value type (int or float).
+                value, data_type = _get_data_value_and_type(item_value)
 
                 # Data type.
                 if vtk_geom_type == mpy.vtk_geo.cell:
-                    vtk_data_type = self._get_vtk_data_type(value)
+                    vtk_tensor_type = self._get_vtk_data_type(value)
                 else:
                     for item in value:
-                        vtk_data_type = self._get_vtk_data_type(item)
+                        vtk_tensor_type = self._get_vtk_data_type(item)
 
                 # Check if key already exists.
-                if key not in self.data[vtk_geom_type, vtk_data_type].keys():
+                if key not in self.data[vtk_geom_type, vtk_tensor_type].keys():
 
                     # Set up the VTK data array.
-                    data = vtk.vtkDoubleArray()
+                    if data_type is mpy.vtk_type.float:
+                        data = vtk.vtkDoubleArray()
+                    else:
+                        data = vtk.vtkIntArray()
                     data.SetName(key)
-                    if vtk_data_type == mpy.vtk_data.scalar:
+                    if vtk_tensor_type == mpy.vtk_tensor.scalar:
                         data.SetNumberOfComponents(1)
                     else:
                         data.SetNumberOfComponents(3)
@@ -157,8 +216,18 @@ class VTKWriter(object):
                     else:
                         n_items = self.grid.GetNumberOfPoints()
                     for i in range(n_items):
-                        self._add_data(data, vtk_data_type)
-                    self.data[vtk_geom_type, vtk_data_type][key] = data
+                        self._add_data(data, vtk_tensor_type)
+                    self.data[vtk_geom_type, vtk_tensor_type][key] = data
+
+                else:
+                    # In this case we just check that the already existing
+                    # data has the same type.
+                    data_array = self.data[vtk_geom_type, vtk_tensor_type][key]
+                    if not _get_vtk_array_type(data_array) == data_type:
+                        raise ValueError(('The existing data with the key "{}"'
+                            + ' is of type "{}", but the type you tried to add'
+                            + ' is "{}"!').format(key,
+                                data_array.GetDataTypeAsString(), data_type))
 
         # Create the cell.
         geometry_item = cell_type()
@@ -199,12 +268,17 @@ class VTKWriter(object):
 
                 # Check if an existing field is also given for this function.
                 if key in data_container.keys():
+
+                    # Get the data and the value type (int or float).
+                    data_values, _ = _get_data_value_and_type(
+                        data_container[key])
+
                     # Add the given data.
                     if key_geom == mpy.vtk_geo.cell:
                         self._add_data(value, key_data,
-                            non_zero_data=data_container[key])
+                            non_zero_data=data_values)
                     else:
-                        for item in data_container[key]:
+                        for item in data_values:
                             self._add_data(value, key_data, non_zero_data=item)
                 else:
                     # Add empty data.
@@ -219,26 +293,32 @@ class VTKWriter(object):
 
         if isinstance(data, list) or isinstance(data, np.ndarray):
             if len(data) == 3:
-                return mpy.vtk_data.vector
+                return mpy.vtk_tensor.vector
             else:
                 raise IndexError('Only 3d vectors are implemented yet! Got '
                     + 'len(data) = {}'.format(len(data)))
         elif isinstance(data, numbers.Number):
-            return mpy.vtk_data.scalar
+            return mpy.vtk_tensor.scalar
 
         raise ValueError('Data {} did not match any expected case!'.format(
             data))
 
-    def _add_data(self, data, vtk_data_type, non_zero_data=None):
+    def _add_data(self, data, vtk_tensor_type, non_zero_data=None):
         """Add data to a VTK data array."""
-        if vtk_data_type == mpy.vtk_data.scalar:
+
+        if _get_vtk_array_type(data) == mpy.vtk_type.int:
+            nan_value = mpy.vtk_nan_int
+        elif _get_vtk_array_type(data) == mpy.vtk_type.float:
+            nan_value = mpy.vtk_nan_float
+
+        if vtk_tensor_type == mpy.vtk_tensor.scalar:
             if non_zero_data is None:
-                data.InsertNextTuple1(0)
+                data.InsertNextTuple1(nan_value)
             else:
                 data.InsertNextTuple1(non_zero_data)
         else:
             if non_zero_data is None:
-                data.InsertNextTuple3(0, 0, 0)
+                data.InsertNextTuple3(nan_value, nan_value, nan_value)
             else:
                 data.InsertNextTuple3(non_zero_data[0], non_zero_data[1],
                     non_zero_data[2])

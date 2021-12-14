@@ -77,8 +77,8 @@ BEAMS_ADDITEXT                  Yes
 BEAMS_EXTVAL                    0.01
 BEAMS_BTSPH                     Yes
 --------------------------------------------------------------------BINNING STRATEGY
-CUTOFF_RADIUS                   20
-BOUNDINGBOX                     -100 -100 -100 100 100 100
+BIN_SIZE_LOWER_BOUND            20
+DOMAINBOUNDINGBOX               -100 -100 -100 100 100 100
 ------------------------------------------------STRUCT NOX/Printing
 Outer Iteration                 = Yes
 Inner Iteration                 = No
@@ -104,4 +104,5 @@ VARIABLE 0 NAME a TYPE linearinterpolation NUMPOINTS 3 TIMES 0.0 0.2 1.0 VALUES 
 STRUCTURE DIS structure NODE 268 QUANTITY dispx VALUE 1. TOLERANCE 1e-10
 STRUCTURE DIS structure NODE 268 QUANTITY dispy VALUE 1. TOLERANCE 1e-10
 STRUCTURE DIS structure NODE 268 QUANTITY dispz VALUE 1. TOLERANCE 1e-10
+------------------------------------------------------------------FLUID ELEMENTS
 -------------------------------------------------------------------------END
