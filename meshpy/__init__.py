@@ -71,6 +71,10 @@ from .header_functions import (
     set_runtime_output,
 )
 
+# Sub modules to be included in the main module module
+from . import abaqus
+from . import mesh_creation_functions
+
 # Define the items that will be exported by default.
 __all__ = [
     # Option object.
@@ -101,4 +105,7 @@ __all__ = [
     "set_header_static",
     "set_runtime_output",
     "set_beam_to_solid_meshtying",
+    # Sub modules.
+    "abaqus",
+    "mesh_creation_functions",
 ]
