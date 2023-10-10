@@ -23,7 +23,7 @@ mat = MaterialReissner()
 R = 2.0
 tz = 4.0  # incline
 n = 1  # number of turns
-n_el = 5
+n_el = 1
 
 # Create a helix with a parametric curve.
 def helix(t):
@@ -44,10 +44,8 @@ def meins():
     )
 
 
-def fib(n):
-    return n if n < 2 else fib(n - 2) + fib(n - 1)
+# with Profile() as profile:
+#     print(f"{meins() = }")
+#     (Stats(profile).strip_dirs().sort_stats(SortKey.CUMULATIVE).print_stats())
 
-
-with Profile() as profile:
-    print(f"{meins() = }")
-    (Stats(profile).strip_dirs().sort_stats(SortKey.CALLS).print_stats())
+meins()
