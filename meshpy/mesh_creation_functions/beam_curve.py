@@ -101,6 +101,8 @@ def create_beam_mesh_curve(
         with all nodes of the curve.
     """
 
+    print("start")
+
     # Packages for AD and numerical integration.
     from autograd import jacobian
     import autograd.numpy as npAD
@@ -167,8 +169,11 @@ def create_beam_mesh_curve(
         Calculate the parameter t where the length along the curve is
         arc_length. t0 is the start point for the Newton iteration.
         """
-        t_root = optimize.newton(lambda t: S(t, **kwargs) - arc_length, t0, fprime=ds)
-        return t_root
+        t_root = optimize.newton(
+            lambda t: S(t, **kwargs) - arc_length, t0, fprime=ds, full_output=True
+        )
+        print(t_root[1])
+        return t_root[0]
 
     class BeamFunctions:
         """
@@ -247,6 +252,25 @@ def create_beam_mesh_curve(
     # Now create the beam.
     # Get the length of the whole segment.
     length = S(interval[1])
+
+    # print(integrate.quad(ds, interval[0], interval[1]))
+
+    # n = 10
+    # full_integration_output = integrate.quad(
+    #     ds,
+    #     interval[0],
+    #     interval[1],
+    #     points=np.linspace(interval[0], interval[1], n),
+    #     limit=n,
+    #     full_output=True,
+    # )
+    # points = full_integration_output[2]["alist"]
+    # print(points)
+    # # points.append(interval[1])
+    # interval_lengths = full_integration_output[2]["rlist"]
+    # accumulated_lengths = interval_lengths
+    # for i in range(1, len(accumulated_lengths)):
+    #     accumulated_lengths[i] += accumulated_lengths[i - 1]
 
     # Create the beam in the mesh
     return create_beam_mesh_function(

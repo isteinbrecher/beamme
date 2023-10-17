@@ -9,8 +9,8 @@ from meshpy import Rotation, InputFile, Beam3rHerm2Line3, MaterialReissner
 from meshpy.mesh_creation_functions import create_beam_mesh_curve
 
 
-from cProfile import Profile
-from pstats import SortKey, Stats
+# from cProfile import Profile
+# from pstats import SortKey, Stats
 
 
 # Create input file.
@@ -23,7 +23,7 @@ mat = MaterialReissner()
 R = 2.0
 tz = 4.0  # incline
 n = 1  # number of turns
-n_el = 1
+n_el = 9
 
 # Create a helix with a parametric curve.
 def helix(t):
@@ -40,7 +40,7 @@ def helix(t):
 
 def meins():
     helix_set = create_beam_mesh_curve(
-        input_file, Beam3rHerm2Line3, mat, helix, [0.0, 2.0 * np.pi * n], n_el=n_el
+        input_file, Beam3rHerm2Line3, mat, helix, [0.0, 6], n_el=n_el
     )
 
 
@@ -49,3 +49,4 @@ def meins():
 #     (Stats(profile).strip_dirs().sort_stats(SortKey.CUMULATIVE).print_stats())
 
 meins()
+print("done")
