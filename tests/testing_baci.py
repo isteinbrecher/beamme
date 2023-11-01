@@ -38,7 +38,7 @@ to this file at some point.
 import unittest
 
 # Testing imports.
-from testing_utility import compare_test_result
+from testing_utility import BaseTest, compare_test_result
 
 # Meshpy imports.
 from meshpy import (
@@ -48,7 +48,7 @@ from meshpy import (
 )
 
 
-class TestBaci(unittest.TestCase):
+class TestBaci(BaseTest):
     """
     Test BACI related functionality in MeshPy
     """
@@ -59,6 +59,8 @@ class TestBaci(unittest.TestCase):
         values for each test. The values can be changed in the individual
         tests.
         """
+
+        super().setUp()
 
         # Set default values for global parameters.
         mpy.set_default_values()

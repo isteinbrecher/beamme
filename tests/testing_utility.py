@@ -42,6 +42,8 @@ import xml.etree.ElementTree as ET
 import vtk
 from vtk.util import numpy_support as vtk_numpy
 
+import unittest
+
 
 # Global variable if this test is run by GitHub.
 if "TESTING_GITHUB" in os.environ.keys() and os.environ["TESTING_GITHUB"] == "1":
@@ -333,3 +335,20 @@ def compare_vtk_data(path1, path2, *, raise_error=False, tol_float=None):
 def compare_vtk(self, name, ref_file, vtk_file, *, tol_float=1e-14):
     """Compare two vtk files and raise an error if they are not equal."""
     self.assertTrue(compare_vtk_data(ref_file, vtk_file, tol_float=tol_float), name)
+
+
+class BaseTest(unittest.TestCase):
+    """ """
+
+    def setUp(self):
+        """Check that the name of the test fits into the naming scheme"""
+
+        import inspect
+
+        class_name = self.__class__.__name__
+        class_file_name = inspect.getfile(self.__class__)
+        test_name = self._testMethodName
+
+        print(class_name)
+        print(class_file_name)
+        print(test_name)
