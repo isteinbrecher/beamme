@@ -39,7 +39,12 @@ import numpy as np
 
 # Meshpy imports.
 from meshpy import mpy, Rotation
-from meshpy.rotation import get_relative_rotation, smallest_rotation
+from meshpy.rotation import (
+    get_relative_rotation,
+    smallest_rotation,
+    SpecialEuclideanGroup,
+    SE3_interpolation_between_nodes,
+)
 
 
 class TestRotation(unittest.TestCase):
@@ -289,6 +294,45 @@ class TestRotation(unittest.TestCase):
         ]
         self.assertLess(
             np.linalg.norm(rot_smallest.q - rot_smallest_ref), mpy.eps_quaternion
+        )
+
+    def test_SE3_interpolation(self):
+        """Test the interpolation of SE3 elements"""
+
+        points = [[0, 0, 0], [1, 1, 0], [2, 2, 2]]
+        rotations = [
+            Rotation(),
+            Rotation([1, 2, 3], np.pi / 7.0),
+            Rotation([1, -2, 3], 2.0 / 7.0),
+        ]
+        parameter_coordinates = [0, 0.25, 1]
+        interpolation = SE3_interpolation_between_nodes(
+            points, rotations, parameter_coordinates
+        )
+
+        for xi, point, rotation in zip(parameter_coordinates, points, rotations):
+            pos, rot = interpolation(xi)
+            self.assertTrue(np.allclose(point, pos, atol=mpy.eps_pos))
+            self.assertTrue(rotation == rot)
+
+        pos, rot = interpolation(5.0 / 7.0)
+        self.assertTrue(
+            np.allclose(
+                [1.9060453029144173, 2.1360526262660393, 0.8188136191085394],
+                pos,
+                atol=mpy.eps_pos,
+            )
+        )
+        self.assertTrue(
+            Rotation(
+                [
+                    0.9617219948141024,
+                    0.08121048308113478,
+                    0.0956000997283532,
+                    0.24363144924340419,
+                ]
+            )
+            == rot
         )
 
 
