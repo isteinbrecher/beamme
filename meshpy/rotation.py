@@ -39,6 +39,18 @@ import numpy as np
 from . import mpy
 
 
+def skew_matrix(vector):
+    """Return the skew matrix for the vector"""
+    skew = np.zeros([3, 3])
+    skew[0, 1] = -vector[2]
+    skew[0, 2] = vector[1]
+    skew[1, 0] = vector[2]
+    skew[1, 2] = -vector[0]
+    skew[2, 0] = -vector[1]
+    skew[2, 1] = vector[0]
+    return skew
+
+
 class Rotation:
     """
     A class that represents a rotation of a coordinate system.
@@ -169,15 +181,7 @@ class Rotation:
         Return the rotation matrix for this rotation.
         (Krenk (3.50))
         """
-
-        q_skew = np.zeros([3, 3])
-        q_skew[0, 1] = -self.q[3]
-        q_skew[0, 2] = self.q[2]
-        q_skew[1, 0] = self.q[3]
-        q_skew[1, 2] = -self.q[1]
-        q_skew[2, 0] = -self.q[2]
-        q_skew[2, 1] = self.q[1]
-
+        q_skew = skew_matrix(self.q[1:])
         R = (
             (self.q[0] ** 2 - np.dot(self.q[1:], self.q[1:])) * np.eye(3)
             + 2 * self.q[0] * q_skew
@@ -434,3 +438,190 @@ def smallest_rotation(q: Rotation, t):
     g3 = g3_old - np.dot(g3_old, g1) / (1 + np.dot(g1_old, g1)) * (g1 + g1_old)
 
     return Rotation.from_rotation_matrix(np.transpose([g1, g2, g3]))
+
+
+class SpecialEuclideanGroup:
+    """This class represents an object of the special Euclidean group (SE3)
+
+    For more details have a look at:
+    Sonneville, V., Cardona, A., and Brüls, O., 2014, “Geometrically Exact Beam Finite Element
+    Formulated on the Special Euclidean Group SE(3),” Computer Methods in Applied Mechanics and
+    Engineering, 268, pp. 451–474.
+    """
+
+    def __init__(self, position, rotation: Rotation) -> None:
+        """Set the position and the rotation for this SE3 element"""
+        self.position = position
+        self.rotation = rotation
+
+    @classmethod
+    def from_matrix_representation(cls, H):
+        """Return the object from a matrix representation"""
+        if not H.shape == (4, 4):
+            raise ValueError(f"Matrix shape is wrong, got {H.shape}")
+        if not np.allclose(H[3, :], [0, 0, 0, 1]):
+            raise ValueError(f"Last row in matrix is wrong {H[3, :]}")
+
+        rotation = Rotation.from_rotation_matrix(H[:3, :3])
+        position = H[:3, 3]
+        return cls(position, rotation)
+
+    def inv(self):
+        """Return the inverse of this SE3 object."""
+        return SpecialEuclideanGroup.from_matrix_representation(
+            self.get_inv_matrix_representation()
+        )
+
+    def __mul__(self, other):
+        """Multiply this SE3 item with another SE3 item"""
+
+        # Check if the other object is also a SE3 item
+        if isinstance(other, SpecialEuclideanGroup):
+            H_self = self.get_matrix_representation()
+            H_other = other.get_matrix_representation()
+            return SpecialEuclideanGroup.from_matrix_representation(
+                np.dot(H_self, H_other)
+            )
+        raise NotImplementedError("Error, not implemented, does not make sense anyway!")
+
+    def get_matrix_representation(self):
+        """Return the SE3 matrix representation"""
+        H = np.zeros((4, 4))
+        H[:3, :3] = self.rotation.get_rotation_matrix()
+        H[:3, 3] = self.position
+        H[3, 3] = 1.0
+        return H
+
+    def get_inv_matrix_representation(self):
+        """Return the SE3 matrix representation"""
+        H = np.zeros((4, 4))
+        rotation_matrix_inv = self.rotation.get_rotation_matrix().transpose()
+        H[:3, :3] = rotation_matrix_inv
+        H[:3, 3] = -np.dot(rotation_matrix_inv, self.position)
+        H[3, 3] = 1.0
+        return H
+
+    def Log_SE3(self):
+        """Return the Log_SE3 of this SE3 element.
+        See Section A.2 of the reference mentioned above."""
+
+        omega = self.rotation.get_rotation_vector()
+
+        Log_SE3 = H = np.zeros(6)
+        Log_SE3[:3] = np.dot(
+            self.get_transformation_matrix_inv(omega).transpose(), self.position
+        )
+        Log_SE3[3:] = omega
+
+        return Log_SE3
+
+    @classmethod
+    def from_Exp_SE3(cls, h):
+        """Return the exponential map Exp_SE3 for a given vector h.
+        See Section A.2 of the reference mentioned above."""
+        h_u = h[:3]
+        h_omega = h[3:]
+        T = cls.get_transformation_matrix(h_omega)
+        return cls(np.dot(T.transpose(), h_u), Rotation.from_rotation_vector(h_omega))
+
+    @staticmethod
+    def get_transformation_matrix(rotation_vector):
+        """Return the transformation matrix for a given rotation"""
+
+        omega = rotation_vector
+        omega_norm = np.linalg.norm(omega)
+        omega_skew = skew_matrix(omega)
+
+        # Note: We have to take the square here, since there there is a division by the
+        # square of the angle in the following formula
+        if omega_norm**2 > mpy.eps_quaternion:
+            alpha = np.sin(omega_norm) / omega_norm
+            beta = 2.0 * (1.0 - np.cos(omega_norm)) / omega_norm**2
+            T_SO3 = (
+                np.identity(3)
+                - 0.5 * beta * omega_skew
+                + (1.0 - alpha) / omega_norm**2 * (np.dot(omega_skew, omega_skew))
+            )
+        else:
+            # Note: this is the constant part of the Taylor series expansion. If this function is
+            # derived with automatic differentiation, we have to also add higher order terms.
+            T_SO3 = np.identity(3)
+        return T_SO3
+
+    @staticmethod
+    def get_transformation_matrix_inv(rotation_vector):
+        """Return the inverse of the transformation matrix for a given rotation"""
+
+        omega = rotation_vector
+        omega_norm = np.linalg.norm(omega)
+        omega_skew = skew_matrix(omega)
+
+        # Note: We have to take the square here, since there there is a division by the
+        # square of the angle in the following formula
+        if omega_norm**2 > mpy.eps_quaternion:
+            alpha = np.sin(omega_norm) / omega_norm
+            beta = 2.0 * (1.0 - np.cos(omega_norm)) / omega_norm**2
+            T_inv_SO3 = (
+                np.identity(3)
+                + 0.5 * omega_skew
+                + 1.0
+                / omega_norm**2
+                * (1 - alpha / beta)
+                * (np.dot(omega_skew, omega_skew))
+            )
+        else:
+            # Note: this is the constant part of the Taylor series expansion. If this function is
+            # derived with automatic differentiation, we have to also add higher order terms.
+            T_inv_SO3 = np.identity(3)
+        return T_inv_SO3
+
+
+def SE3_interpolation_between_nodes(positions, rotations, parameter_coordinates):
+    """Perform a spatial interpolation between elements of SE3.
+
+    This is a mix between the approach presented in Sonneville (2014) and Crisfield, Jelenic (1999).
+    We generate an averaged element in SE3 (arithmetic average of position and normed average of
+    the quaternion components) and interpolate the relative logarithmic maps in SE3 for each node.
+
+    Args
+    ----
+    positions: list(3D array)
+        List of the nodal positions
+    rotations: list(Rotation)
+        List of the nodal rotations
+    parameter_coordinates: list(float)
+        List of the parameter coordinates for each node
+    """
+
+    from scipy.interpolate import lagrange
+
+    # Get averaged position and rotation
+    r_average = np.zeros(3)
+    q_average = np.zeros(4)
+    for position, rotation in zip(positions, rotations):
+        r_average += position
+        q_average += rotation.q
+    r_average = r_average / len(position)
+    q_average = q_average / np.linalg.norm(q_average)
+    q_average = Rotation(q_average)
+    H_average = SpecialEuclideanGroup(r_average, q_average)
+    H_average_inv = H_average.inv()
+
+    # Get the relative SE3 distance for each node
+    d_nodes = np.zeros((len(positions), 6))
+    for i_node, (position, rotation) in enumerate(zip(positions, rotations)):
+        H_node = SpecialEuclideanGroup(position, rotation)
+        H_rel = H_average_inv * H_node
+        d_nodes[i_node] = H_rel.Log_SE3()
+
+    # Get the interpolation function
+    interpolation_functions = [
+        lagrange(parameter_coordinates, d_nodes[:, i]) for i in range(6)
+    ]
+
+    def interpolate(xi):
+        H = np.array([interpolation_functions[i](xi) for i in range(6)])
+        H_interpolated = H_average * SpecialEuclideanGroup.from_Exp_SE3(H)
+        return (H_interpolated.position, H_interpolated.rotation)
+
+    return interpolate
