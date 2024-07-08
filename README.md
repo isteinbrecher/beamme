@@ -95,28 +95,3 @@ Also run the performance tests (the reference time values and host name might ha
 cd <path_to_meshpy>/tests
 python3 performance_testing.py
 ```
-
-### Optional dependency on [ArborX](https://github.com/arborx/ArborX)
-
-MeshPy can optionally execute its geometric search functions using the C++ library [ArborX](https://github.com/arborx/ArborX).
-First make sure the `pybind11` submodule is loaded
-```bash
-cd <path_to_meshpy>
-git submodule update --init
-```
-To setup meshpy with ArborX, `cmake` and Kokkos are available on your system (the preferred variant is via [Spack](https://spack.io/)).
-Create a build directory
-```bash
-mkdir -p <path_to_meshpy>/build/geometric_search
-```
-Configure cmake and build the extension
-```bash
-cd <path_to_meshpy>/build/geometric_search
-cmake ../../meshpy/geometric_search/src/
-make -j4
-```
-If the ArborX extension is working correctly can be checked by running the geometric search tests
-```bash
-cd <path_to_meshpy>/tests
-python3 testing_geometric_search.py
-```

@@ -88,15 +88,6 @@ class DoubleNodes(Enum):
     keep = auto()
 
 
-class GeometricSearchAlgorithm(Enum):
-    """Enum for VTK value types."""
-
-    automatic = auto()
-    brute_force_cython = auto()
-    binning_cython = auto()
-    boundary_volume_hierarchy_arborx = auto()
-
-
 class VTKGeometry(Enum):
     """Enum for VTK geometry types (for now cells and points)."""
 
@@ -143,9 +134,6 @@ class MeshPy(object):
 
         # Handling of multiple nodes in Neumann bcs.
         self.double_nodes = DoubleNodes
-
-        # Geometric search options.
-        self.geometric_search_algorithm = GeometricSearchAlgorithm
 
         # VTK types.
         # Geometry types, cell or point.
