@@ -57,6 +57,10 @@ def run_four_c(
     If the corresponding keyword arguments are set, they overwrite the environment
     variable.
 
+    If an environment variable "MESHPY_RUN_4C_WITH_QUEENS" exists, then the QUEENS
+    "run_subprocess_with_logging" functionality is used to run 4C. This additionally
+    requires the environment variable "QUEENS_JOB_ID".
+
     Args
     ----
     input_file: str
@@ -77,7 +81,8 @@ def run_four_c(
     restart_from: str
         Path to initial simulation (relative to output_dir)
     log_to_console: bool
-        If the 4C simulation output should be shown in the console.
+        If the 4C simulation output should be shown in the console. This has no
+        effect if 4C is run with QUEENS.
 
     Return
     ----
@@ -121,27 +126,48 @@ def run_four_c(
             "Provide either both or no argument of [restart_step, restart_from]"
         )
 
-    # Actually run the command
-    with open(log_file, "w") as stdout_file, open(error_file, "w") as stderr_file:
-        process = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            cwd=output_dir,
-            text=True,
+    # Actually run the command, depending on the method provided
+    run_with_queens = (
+        get_env_variable("MESHPY_RUN_4C_WITH_QUEENS", default=None) is not None
+    )
+    if not run_with_queens:
+        with open(log_file, "w") as stdout_file, open(error_file, "w") as stderr_file:
+            process = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=output_dir,
+                text=True,
+            )
+
+            for stdout_line in process.stdout:
+                if log_to_console:
+                    sys.stdout.write(stdout_line)
+                stdout_file.write(stdout_line)
+
+            for stderr_line in process.stderr:
+                if log_to_console:
+                    sys.stderr.write(stderr_line)
+                stderr_file.write(stderr_line)
+
+            process.stdout.close()
+            process.stderr.close()
+            return_code = process.wait()
+        return return_code
+
+    else:
+        from queens.utils.run_subprocess import run_subprocess_with_logging
+
+        job_id = get_env_variable("QUEENS_JOB_ID")
+        command_string = " ".join(command)
+        command_string = f"cd {output_dir} && " + command_string
+        return_code, process_id, stdout, stderr = run_subprocess_with_logging(
+            command_string,
+            terminate_expression="PROC.*ERROR",
+            logger_name=__name__ + f"_{job_id}",
+            log_file=log_file,
+            error_file=error_file,
+            streaming=False,
+            raise_error_on_subprocess_failure=False,
         )
-
-        for stdout_line in process.stdout:
-            if log_to_console:
-                sys.stdout.write(stdout_line)
-            stdout_file.write(stdout_line)
-
-        for stderr_line in process.stderr:
-            if log_to_console:
-                sys.stderr.write(stderr_line)
-            stderr_file.write(stderr_line)
-
-        process.stdout.close()
-        process.stderr.close()
-        return_code = process.wait()
-    return return_code
+        return return_code
