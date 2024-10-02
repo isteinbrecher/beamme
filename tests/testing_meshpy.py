@@ -45,7 +45,6 @@ import vtk
 from meshpy import (
     mpy,
     Rotation,
-    InputFile,
     MaterialReissner,
     MaterialReissnerElastoplastic,
     MaterialBeam,
@@ -91,6 +90,7 @@ from utils import (
     compare_strings,
     compare_test_result,
     compare_vtk,
+    InputFile,
 )
 
 

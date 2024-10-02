@@ -45,9 +45,13 @@ if __name__ == "__main__":
 
     empty_testing_directory()
 
+    from utils import check_used_reference_files
+
     # Load the test cases.
     testsuite = unittest.TestLoader().discover(".", pattern="testing_*.py")
 
     # Perform the tests
     run = unittest.TextTestRunner(verbosity=1).run(testsuite)
+
+    check_used_reference_files()
     sys.exit(not (run.wasSuccessful()))

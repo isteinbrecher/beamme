@@ -74,7 +74,12 @@ from meshpy.mesh_creation_functions.beam_nurbs import (
 )
 
 # Testing imports.
-from utils import testing_input, compare_test_result, compare_strings
+from utils import (
+    testing_input,
+    compare_test_result,
+    compare_strings,
+    append_used_reference_file,
+)
 
 
 def create_helix_function(
@@ -603,13 +608,12 @@ class TestMeshCreationFunctions(unittest.TestCase):
         input_file.add(helix_set)
 
         # Compare the coordinates with the ones from Mathematica.
-        coordinates_mathematica = np.loadtxt(
-            os.path.join(
-                testing_input,
-                "test_mesh_creation_functions_curve_3d_helix_mathematica.csv",
-            ),
-            delimiter=",",
+        ref_file = os.path.join(
+            testing_input,
+            "test_mesh_creation_functions_curve_3d_helix_mathematica.csv",
         )
+        append_used_reference_file(ref_file)
+        coordinates_mathematica = np.loadtxt(ref_file, delimiter=",")
         self.assertLess(
             np.linalg.norm(
                 coordinates_mathematica - get_nodal_coordinates(input_file.nodes)
@@ -681,13 +685,12 @@ class TestMeshCreationFunctions(unittest.TestCase):
         input_file.add(sin_set)
 
         # Compare the coordinates with the ones from Mathematica.
-        coordinates_mathematica = np.loadtxt(
-            os.path.join(
-                testing_input,
-                "test_mesh_creation_functions_curve_2d_sin_mathematica.csv",
-            ),
-            delimiter=",",
+        ref_file = os.path.join(
+            testing_input,
+            "test_mesh_creation_functions_curve_2d_sin_mathematica.csv",
         )
+        append_used_reference_file(ref_file)
+        coordinates_mathematica = np.loadtxt(ref_file, delimiter=",")
         self.assertLess(
             np.linalg.norm(
                 coordinates_mathematica - get_nodal_coordinates(input_file.nodes)

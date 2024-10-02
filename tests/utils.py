@@ -66,6 +66,9 @@ testing_temp = os.path.join(testing_path, "testing-tmp")
 # Check and clean the temporary directory.
 os.makedirs(testing_temp, exist_ok=True)
 
+# A list containing all files in reference-files that are used during testing
+used_reference_files = []
+
 
 def empty_testing_directory():
     """Delete all files in the testing directory, if it exists."""
@@ -153,6 +156,8 @@ def compare_test_result(
         reference_file_name += "." + extension
     reference_file_path = os.path.join(testing_input, reference_file_name)
 
+    append_used_reference_file(reference_file_path)
+
     # Compare the results
     compare_strings(self, reference_file_path, result_string, **kwargs)
 
@@ -229,6 +234,8 @@ def compare_strings(self, reference, compare, *, rtol=None, atol=None, **kwargs)
 def compare_vtk(self, path_1, path_2, *, tol_float=1e-14):
     """Compare two vtk files and raise an error if they are not equal."""
 
+    append_used_reference_file(path_1)
+
     def get_vtk(path):
         """
         Return a vtk object for the file at path.
@@ -242,3 +249,37 @@ def compare_vtk(self, path_1, path_2, *, tol_float=1e-14):
         get_vtk(path_1), get_vtk(path_2), output=True, tol=tol_float
     )
     self.assertTrue(compare[0], msg="\n".join(compare[1]))
+
+
+def append_used_reference_file(path):
+    """Append a file path to the list of used file reference files"""
+    #   if not testing_input in path:
+    #        raise ValueError(f"The file {path} is not in the reference-files directory")
+    used_reference_files.append(os.path.basename(path))
+
+
+def check_used_reference_files():
+    """"""
+
+    reference_files = [
+        path
+        for path in os.listdir(testing_input)
+        if os.path.isfile(os.path.join(testing_input, path))
+    ]
+    missed_files = []
+    for file in reference_files:
+        if file not in used_reference_files:
+            missed_files.append(file)
+
+    print(missed_files)
+
+
+from meshpy import InputFile as InputFileMeshPy
+
+
+class InputFile(InputFileMeshPy):
+    """Mock for input file"""
+
+    def read_dat(self, file_path):
+        append_used_reference_file(file_path)
+        super().read_dat(file_path)

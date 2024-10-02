@@ -39,7 +39,6 @@ import os
 
 # Meshpy imports
 from meshpy import (
-    InputFile,
     MaterialStVenantKirchhoff,
     MaterialString,
     Rotation,
@@ -56,7 +55,7 @@ from meshpy.mesh_creation_functions import (
 )
 
 # Testing imports
-from utils import testing_input, compare_test_result
+from utils import compare_test_result, InputFile
 
 
 class TestNurbsMeshCreationFunction(unittest.TestCase):

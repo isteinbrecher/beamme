@@ -43,13 +43,13 @@ from utils import (
     compare_test_result,
     testing_temp,
     testing_input,
+    InputFile,
 )
 
 # Meshpy imports.
 from meshpy import (
     mpy,
     Rotation,
-    InputFile,
     InputSection,
     MaterialReissner,
     Function,

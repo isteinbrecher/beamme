@@ -38,7 +38,13 @@ import unittest
 import numpy as np
 
 # Testing imports
-from utils import compare_test_result, compare_vtk, testing_input, testing_temp
+from utils import (
+    compare_test_result,
+    compare_vtk,
+    testing_input,
+    testing_temp,
+    InputFile,
+)
 
 # Meshpy imports
 from meshpy import (
@@ -46,7 +52,6 @@ from meshpy import (
     BoundaryCondition,
     Function,
     GeometrySet,
-    InputFile,
     MaterialReissner,
     mpy,
     Rotation,
