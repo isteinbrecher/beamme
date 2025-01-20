@@ -37,6 +37,7 @@ _site
 .sass-cache
 .jekyll-metadata
 *.lock
+references_all_output.md
 website/public/
 
 # Don't ignore directory of Github workflows

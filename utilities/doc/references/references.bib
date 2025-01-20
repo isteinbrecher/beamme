@@ -1,0 +1,120 @@
+@article{Steinbrecher2020,
+  author  = {Steinbrecher, Ivo and Mayr, Matthias and Grill, Maximilian J. and Kremheller, Johannes and Meier, Christoph and Popp, Alexander},
+  journal = {Computational Mechanics},
+  title   = {A mortar-type finite element approach for embedding {1D} beams into {3D} solid volumes},
+  year    = {2020},
+  issn    = {1432-0924},
+  number  = {6},
+  pages   = {1377--1398},
+  volume  = {66},
+  doi     = {10.1007/s00466-020-01907-0},
+  url     = {https://doi.org/10.1007/s00466-020-01907-0}
+}
+
+@inproceedings{Steinbrecher2021a,
+  author    = {Steinbrecher, Ivo and Popp, Alexander},
+  booktitle = {Proceedings in Applied Mathematics and Mechanics},
+  title     = {Efficient mortar-based algorithms for embedding {1D} fibers into {3D} volumes},
+  year      = {2021},
+  number    = {1},
+  pages     = {e202000151},
+  volume    = {20},
+  doi       = {10.1002/pamm.202000151},
+  eprint    = {https://onlinelibrary.wiley.com/doi/pdf/10.1002/pamm.202000151},
+  url       = {https://onlinelibrary.wiley.com/doi/abs/10.1002/pamm.202000151}
+}
+
+@article{Steinbrecher2022,
+  author  = {Steinbrecher, Ivo and Popp, Alexander and Meier, Christoph},
+  journal = {Computational Mechanics},
+  title   = {Consistent coupling of positions and rotations for embedding {1D} {C}osserat beams into {3D} solid volumes},
+  year    = {2022},
+  issn    = {1432-0924},
+  number  = {3},
+  pages   = {701--732},
+  volume  = {69},
+  doi     = {10.1007/s00466-021-02111-4},
+  url     = {https://doi.org/10.1007/s00466-021-02111-4}
+}
+
+@inbook{Popp2022,
+  author    = {Popp, Alexander and Steinbrecher, Ivo},
+  chapter   = {Finite element formulations for beam-to-solid interaction -- from embedded fibers towards contact},
+  editor    = {Aldakheel, Fadi and Hudobivnik, Blaž and Soleimani, Meisam and Wessels, Henning and Weißenfels, Christian and Marino, Michele},
+  pages     = {425--434},
+  publisher = {Springer},
+  title     = {Current trends and open problems in computational mechanics},
+  year      = {2022},
+  isbn      = {978-3-030-87312-7},
+  doi       = {10.1007/978-3-030-87312-7}
+}
+
+@article{Hagmeyer2022,
+  author  = {Hagmeyer, Nora and Mayr, Matthias and Steinbrecher, Ivo and Popp, Alexander},
+  journal = {Advanced Modeling and Simulation in Engineering Sciences},
+  title   = {One-way coupled fluid-beam interaction: {C}apturing the effect of embedded slender bodies on global fluid flow and vice versa},
+  year    = {2022},
+  issn    = {2213-7467},
+  number  = {1},
+  pages   = {9},
+  volume  = {9},
+  doi     = {10.1186/s40323-022-00222-y},
+  groups  = {Peer-Reviewed Journals},
+  url     = {https://doi.org/10.1186/s40323-022-00222-y}
+}
+
+@phdthesis{Steinbrecher2022a,
+  author = {Steinbrecher, Ivo},
+  school = {University of the Bundeswehr Munich},
+  title  = {Mixed-dimensional finite element formulations for beam-to-solid interaction},
+  year   = {2022},
+  note   = {German name: Universit{\"a}t der Bundeswehr M{\"u}nchen},
+  url    = {https://athene-forschung.unibw.de/143755}
+}
+
+@inproceedings{Firmbach2023,
+  author    = {Firmbach, Max and Steinbrecher, Ivo and Popp, Alexander and Mayr, Matthias},
+  booktitle = {Proceedings in Applied Mathematics and Mechanics},
+  title     = {Computational challenges in mixed-dimensional beam/solid coupling},
+  year      = {2023},
+  number    = {1},
+  pages     = {e202200227},
+  volume    = {23},
+  doi       = {10.1002/pamm.202200227},
+  eprint    = {https://onlinelibrary.wiley.com/doi/pdf/10.1002/pamm.202200227},
+  url       = {https://onlinelibrary.wiley.com/doi/abs/10.1002/pamm.202200227}
+}
+
+@article{Firmbach2024,
+  author   = {Max Firmbach and Ivo Steinbrecher and Alexander Popp and Matthias Mayr},
+  journal  = {Computer Methods in Applied Mechanics and Engineering},
+  title    = {An approximate block factorization preconditioner for mixed-dimensional beam-solid interaction},
+  year     = {2024},
+  issn     = {0045-7825},
+  pages    = {117256},
+  volume   = {431},
+  abstract = {This paper presents a scalable approximate block factorization preconditioner for mixed-dimensional models in beam-solid interaction and their application in engineering. In particular, it studies the linear systems arising from a regularized mortar-type approach for embedding geometrically exact beams into solid continua. Due to the lack of block diagonal dominance of the arising 2 × 2 block system, an approximate Block-LU preconditioner is used. It exploits the sparsity structure of the beam sub-block to construct a sparse approximate inverse, which is then not only used to explicitly form an approximation of the Schur complement, but also acts as a smoother within the prediction and correction step of the arising Block-LU preconditioner. The Schur complement equation is tackled with an algebraic multigrid method. Although, for now, the beam sub-block is tackled by a one-level method only, the multi-level nature of the computationally demanding Schur equation delivers a scalable preconditioner in practice. In numerical test cases, the influence of different algorithmic parameters on the quality of the sparse approximate inverse is studied and the weak scaling behavior of the proposed preconditioner on up to 1000 MPI ranks is demonstrated. In addition, the robustness of the proposed method regarding material parameters and geometric properties is shown, before the preconditioner is finally applied for the analysis of steel-reinforced concrete structures in civil engineering.},
+  doi      = {https://doi.org/10.1016/j.cma.2024.117256},
+  url      = {https://www.sciencedirect.com/science/article/pii/S0045782524005127}
+}
+
+@phdthesis{Hagmeyer2023,
+  author = {Hagmeyer, Nora},
+  school = {Universit{\"a}t der Bundeswehr M{\"u}nchen},
+  title  = {A computational framework for balloon angioplasty and stented arteries based on mixed-dimensional modeling},
+  year   = {2023},
+  url    = {https://athene-forschung.rz.unibw-muenchen.de/146359}
+}
+
+@article{Hagmeyer2024,
+  author  = {Hagmeyer, Nora and Mayr, Matthias and Popp, Alexander},
+  journal = {International Journal for Numerical Methods in Engineering},
+  title   = {A fully coupled regularized mortar-type finite element approach for embedding one-dimensional fibers into three-dimensional fluid flow},
+  year    = {2024},
+  number  = {8},
+  pages   = {e7435},
+  volume  = {125},
+  doi     = {https://doi.org/10.1002/nme.7435},
+  eprint  = {https://onlinelibrary.wiley.com/doi/pdf/10.1002/nme.7435},
+  url     = {https://onlinelibrary.wiley.com/doi/abs/10.1002/nme.7435}
+}
