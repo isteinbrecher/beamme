@@ -29,11 +29,13 @@ from pathlib import Path as _Path
 from typing import Dict as _Dict
 from typing import List as _List
 
+import quaternion as _quaternion
 from fourcipp.fourc_input import FourCInput as _FourCInput
 
 from beamme.core.boundary_condition import BoundaryCondition as _BoundaryCondition
 from beamme.core.conf import bme as _bme
 from beamme.core.coupling import Coupling as _Coupling
+from beamme.core.element_beam import Beam as _Beam
 from beamme.core.function import Function as _Function
 from beamme.core.geometry_set import GeometrySet as _GeometrySet
 from beamme.core.geometry_set import GeometrySetNodes as _GeometrySetNodes
@@ -46,6 +48,7 @@ from beamme.four_c.input_file_mappings import (
 )
 from beamme.utils.environment import cubitpy_is_available as _cubitpy_is_available
 from beamme.utils.environment import get_git_data as _get_git_data
+from beamme.utils.nodes import get_nodal_quaternions as _get_nodal_quaternions
 
 if _cubitpy_is_available():
     import cubitpy as _cubitpy
@@ -322,7 +325,7 @@ class InputFile(_FourCInput):
                 else:
                     i += 1
 
-        def _dump_mesh_items(section_name, data_list):
+        def _dump_mesh_items(section_name, data_list, global_data):
             """Output a section name and apply either the default dump or the
             specialized the dump_to_list for each list item."""
 
@@ -339,6 +342,8 @@ class InputFile(_FourCInput):
                     or isinstance(item, _NURBSPatch)
                 ):
                     list.extend(item.dump_to_list())
+                elif isinstance(item, _Beam):
+                    list.append(item.dump_to_list(global_data))
                 elif hasattr(item, "dump_to_list"):
                     list.append(item.dump_to_list())
                 elif isinstance(item, _BoundaryCondition):
@@ -364,6 +369,13 @@ class InputFile(_FourCInput):
 
             self.add({section_name: list})
 
+        # Global data for the mesh generation (assume that i_global for the nodes is continuous)
+        global_data = {
+            "rotation_vectors": _quaternion.as_rotation_vector(
+                _get_nodal_quaternions(mesh.nodes)
+            )
+        }
+
         # Add sets from couplings and boundary conditions to a temp container.
         mesh.unlink_nodes()
         start_indices_geometry_set = _get_global_start_geometry_set(self.sections)
@@ -385,7 +397,7 @@ class InputFile(_FourCInput):
         _set_i_global(mesh.functions, start_index=start_index_functions)
 
         # Add material data to the input file.
-        _dump_mesh_items("MATERIALS", mesh.materials)
+        _dump_mesh_items("MATERIALS", mesh.materials, global_data)
 
         # Add the functions.
         for function in mesh.functions:
@@ -416,7 +428,7 @@ class InputFile(_FourCInput):
                     if isinstance(bc_key, str)
                     else _INPUT_FILE_MAPPINGS["boundary_conditions"][(bc_key, geom_key)]
                 )
-                _dump_mesh_items(section_name, bc_list)
+                _dump_mesh_items(section_name, bc_list, global_data)
 
         # Add additional element sections, e.g., for NURBS knot vectors.
         for element in mesh.elements:
@@ -425,11 +437,13 @@ class InputFile(_FourCInput):
         # Add the geometry sets.
         for geom_key, item in mesh_sets.items():
             if len(item) > 0:
-                _dump_mesh_items(_INPUT_FILE_MAPPINGS["geometry_sets"][geom_key], item)
+                _dump_mesh_items(
+                    _INPUT_FILE_MAPPINGS["geometry_sets"][geom_key], item, global_data
+                )
 
         # Add the nodes and elements.
-        _dump_mesh_items("NODE COORDS", mesh.nodes)
-        _dump_mesh_items("STRUCTURE ELEMENTS", mesh.elements)
+        _dump_mesh_items("NODE COORDS", mesh.nodes, global_data)
+        _dump_mesh_items("STRUCTURE ELEMENTS", mesh.elements, global_data)
         # TODO: reset all links and counters set in this method.
 
     def _get_header(self) -> dict:

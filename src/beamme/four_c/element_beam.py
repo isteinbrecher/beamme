@@ -47,7 +47,7 @@ class Beam3rHerm2Line3(_Beam):
     coupling_fix_dict = {"NUMDOF": 9, "ONOFF": [1, 1, 1, 1, 1, 1, 0, 0, 0]}
     coupling_joint_dict = {"NUMDOF": 9, "ONOFF": [1, 1, 1, 0, 0, 0, 0, 0, 0]}
 
-    def dump_to_list(self):
+    def dump_to_list(self, global_data):
         """Return a list with the (single) item representing this element."""
 
         # Check the material.
@@ -65,7 +65,9 @@ class Beam3rHerm2Line3(_Beam):
                 "TRIADS": [
                     item
                     for i in [0, 2, 1]
-                    for item in self.nodes[i].rotation.get_rotation_vector()
+                    for item in global_data["rotation_vectors"][
+                        self.nodes[i].i_global - 1
+                    ]
                 ],
                 "HERMITE_CENTERLINE": True,
             },
@@ -83,7 +85,7 @@ class Beam3rLine2Line2(_Beam):
     coupling_fix_dict = {"NUMDOF": 6, "ONOFF": [1, 1, 1, 1, 1, 1]}
     coupling_joint_dict = {"NUMDOF": 6, "ONOFF": [1, 1, 1, 0, 0, 0]}
 
-    def dump_to_list(self):
+    def dump_to_list(self, global_data):
         """Return a list with the (single) item representing this element."""
 
         # Check the material.
@@ -101,7 +103,9 @@ class Beam3rLine2Line2(_Beam):
                 "TRIADS": [
                     item
                     for i in [0, 1]
-                    for item in self.nodes[i].rotation.get_rotation_vector()
+                    for item in global_data["rotation_vectors"][
+                        self.nodes[i].i_global - 1
+                    ]
                 ],
             },
         }
@@ -132,7 +136,7 @@ class Beam3kClass(_Beam):
                 "and couplings."
             )
 
-    def dump_to_list(self):
+    def dump_to_list(self, global_data):
         """Return a list with the (single) item representing this element."""
 
         # Check the material.
@@ -152,7 +156,9 @@ class Beam3kClass(_Beam):
                 "TRIADS": [
                     item
                     for i in [0, 2, 1]
-                    for item in self.nodes[i].rotation.get_rotation_vector()
+                    for item in global_data["rotation_vectors"][
+                        self.nodes[i].i_global - 1
+                    ]
                 ],
                 **({"USE_FAD": True} if self.is_fad else {}),
             },
@@ -184,7 +190,7 @@ class Beam3eb(_Beam):
     beam_type = _bme.beam.euler_bernoulli
     valid_material = [_MaterialEulerBernoulli]
 
-    def dump_to_list(self):
+    def dump_to_list(self, global_data):
         """Return a list with the (single) item representing this element."""
 
         # Check the material.
