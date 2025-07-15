@@ -380,7 +380,7 @@ class Mesh:
         rot1 = _get_nodal_quaternions(self.nodes)
 
         # Apply the rotation to the rotation of all nodes.
-        rot_new = _add_rotations(rotation, rot1)
+        quaternions_new = _quaternion.as_float_array(_add_rotations(rotation, rot1))
 
         if not only_rotate_triads:
             # Get array with all positions for the nodes.
@@ -389,9 +389,9 @@ class Mesh:
 
         for i, node in enumerate(self.nodes):
             if isinstance(node, _NodeCosserat):
-                node.rotation = _Rotation.from_quaternion(rot_new[i])
+                node.rotation.q = quaternions_new[i]
             if not only_rotate_triads:
-                node.coordinates = pos_new[i, :]
+                node.coordinates = pos_new[i]
 
     def reflect(self, normal_vector, origin=None, flip_beams: bool = False) -> None:
         """Reflect all nodes of the mesh with respect to a plane defined by its
@@ -463,13 +463,13 @@ class Mesh:
         rot2_float[:, 1:] = _np.cross(e3, normal_vector)
 
         # Add to the existing rotations.
-        rot_new = _add_rotations(_quaternion.from_float_array(rot2_float), rot1)
+        quaternions_new = _add_rotations(_quaternion.from_float_array(rot2_float), rot1)
 
         if flip_beams:
             # To achieve the flip, the triads are rotated with the angle pi
             # around the e2 axis.
             rot_flip = _Rotation([0, 1, 0], _np.pi)
-            rot_new = _add_rotations(rot_new, rot_flip)
+            quaternions_new = _add_rotations(quaternions_new, rot_flip)
 
         # For solid elements we need to adapt the connectivity to avoid negative Jacobians.
         # For beam elements this is optional.
@@ -481,10 +481,11 @@ class Mesh:
                 element.flip()
 
         # Set the new positions and rotations.
+        quaternions_new_array = _quaternion.as_float_array(quaternions_new)
         for i, node in enumerate(self.nodes):
             node.coordinates = pos_new[i, :]
             if isinstance(node, _NodeCosserat):
-                node.rotation = _Rotation.from_quaternion(rot_new[i])
+                node.rotation.q = quaternions_new_array[i]
 
     def wrap_around_cylinder(
         self, radius: float | None = None, advanced_warning: bool = True
