@@ -23,6 +23,7 @@
 
 import numpy as _np
 import quaternion as _quaternion
+from numpy.typing import NDArray as _NDArray
 
 from beamme.core.conf import bme as _bme
 
@@ -340,115 +341,61 @@ class Rotation:
         return f"Rotation:\n    q0: {self.q[0]}\n    q: {self.q[1:]}"
 
 
-def add_rotations(rotation_21, rotation_10):
-    """Multiply a rotation onto another.
+def add_rotations(
+    rotation_21: Rotation | _NDArray[_quaternion.quaternion],
+    rotation_10: Rotation | _NDArray[_quaternion.quaternion],
+) -> _NDArray[_quaternion.quaternion]:
+    """Multiply rotations onto another.
 
-    Args
-    ----
-    rotation_10: _np.ndarray
-        Array with the dimensions n x 4 or 4 x 1.
-        The first rotation that is applied.
-    rotation_21: _np.ndarray
-        Array with the dimensions n x 4 or 4 x 1.
-        The second rotation that is applied.
+    Args:
+        rotation_10: The first rotation(s) that are applied.
+        rotation_21: The second rotation(s) that are applied.
 
-    Return
-    ----
-    rot_new: _np.ndarray
-        Array with the dimensions n x 4.
-        This array contains the new quaternions.
+    Returns:
+        An array with the compound quaternions.
     """
 
-    # Transpose the arrays, to work with the following code.
-    if isinstance(rotation_10, Rotation):
-        rot1 = rotation_10.get_quaternion().transpose()
-    else:
-        rot1 = _np.transpose(rotation_10)
-    if isinstance(rotation_21, Rotation):
-        rot2 = rotation_21.get_quaternion().transpose()
-    else:
-        rot2 = _np.transpose(rotation_21)
+    def get_numpy_quaternion_object(rotation):
+        """Return an object that can be used with the numpy quaternion
+        library."""
+        if isinstance(rotation, Rotation):
+            return rotation.get_numpy_quaternion()
+        else:
+            return rotation
 
-    if rot1.size > rot2.size:
-        rotnew = _np.zeros_like(rot1)
-    else:
-        rotnew = _np.zeros_like(rot2)
-
-    # Multiply the two rotations (code is taken from /utility/rotation.nb).
-    rotnew[0] = (
-        rot1[0] * rot2[0] - rot1[1] * rot2[1] - rot1[2] * rot2[2] - rot1[3] * rot2[3]
-    )
-    rotnew[1] = (
-        rot1[1] * rot2[0] + rot1[0] * rot2[1] + rot1[3] * rot2[2] - rot1[2] * rot2[3]
-    )
-    rotnew[2] = (
-        rot1[2] * rot2[0] - rot1[3] * rot2[1] + rot1[0] * rot2[2] + rot1[1] * rot2[3]
-    )
-    rotnew[3] = (
-        rot1[3] * rot2[0] + rot1[2] * rot2[1] - rot1[1] * rot2[2] + rot1[0] * rot2[3]
-    )
-
-    return rotnew.transpose()
+    rotation_21 = get_numpy_quaternion_object(rotation_21)
+    rotation_10 = get_numpy_quaternion_object(rotation_10)
+    return rotation_21 * rotation_10
 
 
-def rotate_coordinates(coordinates, rotation, *, origin=None):
+def rotate_coordinates(
+    coordinates: _NDArray,
+    rotation: Rotation | _NDArray[_quaternion.quaternion],
+    *,
+    origin=None,
+):
     """Rotate all given coordinates.
 
-    Args
-    ----
-    coordinates: _np.array
-        Array of 3D coordinates to be rotated
-    rotation: Rotation, list(quaternions) (nx4)
-        The rotation that will be applied to the coordinates. Can also be an
-        array with a quaternion for each coordinate.
-    origin: 3D vector
-        If this is given, the mesh is rotated about this point. Default is
-        (0,0,0)
+    Args:
+        coordinates: Array of 3D coordinates to be rotated
+        rotation: The rotation(s) that will be applied to the coordinates. If
+            this is an array it has to hold a quaternion for each coordinate.
+    origin (3D vector):  If this is given, the mesh is rotated about this
+        point. Defaults to (0, 0, 0).
     """
 
+    if origin is not None:
+        coordinates_new = coordinates - origin
+    else:
+        coordinates_new = coordinates
+
     if isinstance(rotation, Rotation):
-        rotation = rotation.get_quaternion().transpose()
-
-    # Check if origin has to be added
-    if origin is None:
-        origin = [0.0, 0.0, 0.0]
-
-    # New position array
-    coordinates_new = _np.zeros_like(coordinates)
-
-    # Evaluate the new positions using the numpy data structure
-    # (code is taken from /utility/rotation.nb)
-    rotation = rotation.transpose()
-
-    q0_q0 = _np.square(rotation[0])
-    q0_q1_2 = 2.0 * rotation[0] * rotation[1]
-    q0_q2_2 = 2.0 * rotation[0] * rotation[2]
-    q0_q3_2 = 2.0 * rotation[0] * rotation[3]
-
-    q1_q1 = _np.square(rotation[1])
-    q1_q2_2 = 2.0 * rotation[1] * rotation[2]
-    q1_q3_2 = 2.0 * rotation[1] * rotation[3]
-
-    q2_q2 = _np.square(rotation[2])
-    q2_q3_2 = 2.0 * rotation[2] * rotation[3]
-
-    q3_q3 = _np.square(rotation[3])
-
-    coordinates_new[:, 0] = (
-        (q0_q0 + q1_q1 - q2_q2 - q3_q3) * (coordinates[:, 0] - origin[0])
-        + (q1_q2_2 - q0_q3_2) * (coordinates[:, 1] - origin[1])
-        + (q0_q2_2 + q1_q3_2) * (coordinates[:, 2] - origin[2])
-    )
-    coordinates_new[:, 1] = (
-        (q1_q2_2 + q0_q3_2) * (coordinates[:, 0] - origin[0])
-        + (q0_q0 - q1_q1 + q2_q2 - q3_q3) * (coordinates[:, 1] - origin[1])
-        + (-q0_q1_2 + q2_q3_2) * (coordinates[:, 2] - origin[2])
-    )
-    coordinates_new[:, 2] = (
-        (-q0_q2_2 + q1_q3_2) * (coordinates[:, 0] - origin[0])
-        + (q0_q1_2 + q2_q3_2) * (coordinates[:, 1] - origin[1])
-        + (q0_q0 - q1_q1 - q2_q2 + q3_q3) * (coordinates[:, 2] - origin[2])
-    )
+        rotation_matrix = rotation.get_rotation_matrix()
+        einsum_indices = "ij,nj->ni"
+    else:
+        rotation_matrix = _quaternion.as_rotation_matrix(rotation)
+        einsum_indices = "nij,nj->ni"
+    coordinates_new = _np.einsum(einsum_indices, rotation_matrix, coordinates_new)
 
     if origin is not None:
         coordinates_new += origin

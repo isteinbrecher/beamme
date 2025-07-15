@@ -28,6 +28,7 @@ import warnings
 import autograd.numpy as npAD
 import numpy as np
 import pytest
+import quaternion
 import splinepy
 import vtk
 
@@ -167,7 +168,7 @@ def test_mesh_rotations_individual(assert_results_close):
         rotations[j, :] = rot.get_quaternion()
         node.rotate(rot, origin=origin)
 
-    mesh_2.rotate(rotations, origin=origin)
+    mesh_2.rotate(quaternion.from_float_array(rotations), origin=origin)
 
     # Compare the output for the two meshes.
     assert_results_close(mesh_1, mesh_2)
