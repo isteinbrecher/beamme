@@ -999,7 +999,7 @@ class Mesh:
             solid_grid = _pv.UnstructuredGrid(vtk_writer_solid.grid).clean()
             plotter.add_mesh(solid_grid, color="white", show_edges=True, opacity=0.5)
 
-        if not _is_testing():
+        if True:
             plotter.show()
         else:
             return plotter
