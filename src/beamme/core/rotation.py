@@ -484,3 +484,42 @@ def smallest_rotation(q: Rotation, t):
     q_rel[1:] = _np.cross(g1_old, g1) / (2.0 * q_rel[0])
 
     return Rotation.from_quaternion(q_rel) * q
+
+
+def get_rotation_vector_series(rotations: list[Rotation]):
+    """TODO"""
+
+    def closest_multiple_of_two_pi(x: float) -> float:
+        return 2 * _np.pi * round(x / (2 * _np.pi))
+
+    rotation_vectors = _np.zeros((len(rotations), 3))
+    rotation_vectors[0, :] = rotations[0].get_rotation_vector()
+    for i, rotation in enumerate(rotations[1:]):
+        rotation_vector_last = rotation_vectors[i]
+        current_rotation_vector = rotation.get_rotation_vector()
+        theta = _np.linalg.norm(current_rotation_vector)
+        if theta < _bme.eps_quaternion:
+            theta_last = _np.linalg.norm(rotation_vector_last)
+            if theta_last < _bme.eps_quaternion:
+                rotation_vectors[i + 1] = [0.0, 0.0, 0.0]
+            else:
+                rotation_vector_last
+            rotation_vectors[i + 1] = (
+                rotation_vector_last
+                / theta_last
+                * closest_multiple_of_two_pi(theta_last)
+            )
+        else:
+            axis = current_rotation_vector / theta
+            multiple_of_two_pi = int(
+                _np.round(
+                    (_np.dot(axis, rotation_vector_last) - theta)
+                    / (
+                        2.0 * _np.pi
+                    )  # TODO: check if this really does what we want. How does this work since we take the absolute angle - does this lead to issues?
+                )
+            )
+            rotation_vectors[i + 1] = (
+                current_rotation_vector + (2.0 * _np.pi * multiple_of_two_pi) * axis
+            )
+    return rotation_vectors

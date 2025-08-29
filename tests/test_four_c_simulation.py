@@ -32,7 +32,7 @@ from beamme.core.conf import bme
 from beamme.core.function import Function
 from beamme.core.geometry_set import GeometrySet
 from beamme.core.mesh import Mesh
-from beamme.core.rotation import Rotation
+from beamme.core.rotation import Rotation, get_rotation_vector_series
 from beamme.four_c.beam_interaction_conditions import add_beam_interaction_condition
 from beamme.four_c.dbc_monitor import (
     dbc_monitor_to_mesh,
@@ -1284,8 +1284,8 @@ def test_four_c_simulation_locsys(
 
         # Get the functions describing the rotation vector components.
         ref_rotation = Rotation([0, 0, 1], phi)
-        rotation_vectors = np.array(
-            [(rotation * ref_rotation).get_rotation_vector() for rotation in rotations]
+        rotation_vectors = get_rotation_vector_series(
+            [rotation * ref_rotation for rotation in rotations]
         )
         rotation_vector_component_functions = [
             create_linear_interpolation_function(
