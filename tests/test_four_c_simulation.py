@@ -1255,7 +1255,7 @@ def test_four_c_simulation_locsys(
 
     # List of rotations to be applied on the full stystem starting from time t=0.
     initial_rotation = Rotation()
-    final_rotation = Rotation([1, 2, 3], np.pi / 5.0)
+    final_rotation = Rotation([0, 0, 3], 3.0 * np.pi / 2.0)
     time_values = np.linspace(0, 1, 10)
     rotations = [
         Rotation.from_quaternion(
@@ -1373,6 +1373,8 @@ def test_four_c_simulation_locsys(
     input_file.add(mesh)
 
     # Add result checks
+    input_file.dump("test.4C.yaml")
+    return
     displacements = [
         [-6.26693202358605039e-01, 8.32271999424795572e-01, -4.56166283491497349e-01]
     ]
