@@ -21,6 +21,9 @@
 # THE SOFTWARE.
 """This file defines functions to dump mesh items for 4C."""
 
+from typing import Any as _Any
+
+from beamme.core.conf import bme as _bme
 from beamme.four_c.four_c_types import BeamType as _BeamType
 
 
@@ -56,3 +59,54 @@ def dump_coupling(coupling):
         data = element_type.get_coupling_dict(coupling.data)
 
     return {"E": coupling.geometry_set.i_global + 1, **data}
+
+
+def dump_nurbs_patch_knotvectors(input_file, nurbs_patch) -> None:
+    """Set the knot vectors of the NURBS patch in the input file."""
+
+    patch_data: dict[str, _Any] = {
+        "KNOT_VECTORS": [],
+    }
+
+    for dir_manifold in range(nurbs_patch.get_nurbs_dimension()):
+        knotvector = nurbs_patch.knot_vectors[dir_manifold]
+        num_knots = len(knotvector)
+
+        # Check the type of knot vector, in case that the multiplicity of the first and last
+        # knot vectors is not p + 1, then it is a closed (periodic) knot vector, otherwise it
+        # is an open (interpolated) knot vector.
+        knotvector_type = "Interpolated"
+
+        for i in range(nurbs_patch.polynomial_orders[dir_manifold] - 1):
+            if (abs(knotvector[i] - knotvector[i + 1]) > _bme.eps_knot_vector) or (
+                abs(knotvector[num_knots - 2 - i] - knotvector[num_knots - 1 - i])
+                > _bme.eps_knot_vector
+            ):
+                knotvector_type = "Periodic"
+                break
+
+        patch_data["KNOT_VECTORS"].append(
+            {
+                "DEGREE": nurbs_patch.polynomial_orders[dir_manifold],
+                "TYPE": knotvector_type,
+                "KNOTS": [
+                    knot_vector_val
+                    for knot_vector_val in nurbs_patch.knot_vectors[dir_manifold]
+                ],
+            }
+        )
+
+    if "STRUCTURE KNOTVECTORS" in input_file:
+        # Get all existing patches in the input file - they will be added to the
+        # input file again at the end of this function. By doing it this way, the
+        # FourCIPP type converter will be applied to the current patch.
+        # This also means that we apply the type converter again already existing
+        # patches. But, with the usual number of patches and data size, this
+        # should not lead to a measurable performance impact.
+        patches = input_file.pop("STRUCTURE KNOTVECTORS")["PATCHES"]
+    else:
+        patches = []
+
+    patch_data["ID"] = nurbs_patch.i_nurbs_patch + 1
+    patches.append(patch_data)
+    input_file.add({"STRUCTURE KNOTVECTORS": {"PATCHES": patches}})

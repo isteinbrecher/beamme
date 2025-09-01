@@ -43,6 +43,9 @@ from beamme.core.mesh import Mesh as _Mesh
 from beamme.core.node import Node as _Node
 from beamme.core.nurbs_patch import NURBSPatch as _NURBSPatch
 from beamme.four_c.input_file_dump import dump_coupling as _dump_coupling
+from beamme.four_c.input_file_dump import (
+    dump_nurbs_patch_knotvectors as _dump_nurbs_patch_knotvectors,
+)
 from beamme.four_c.input_file_mappings import (
     INPUT_FILE_MAPPINGS as _INPUT_FILE_MAPPINGS,
 )
@@ -386,7 +389,8 @@ class InputFile(_FourCInput):
 
         # Add additional element sections, e.g., for NURBS knot vectors.
         for element in mesh.elements:
-            element.dump_element_specific_section(self)
+            if isinstance(element, _NURBSPatch):
+                _dump_nurbs_patch_knotvectors(self, element)
 
         # Add the geometry sets.
         for geom_key, item in mesh_sets.items():

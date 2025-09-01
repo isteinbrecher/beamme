@@ -21,8 +21,6 @@
 # THE SOFTWARE.
 """This module implements NURBS patches for the mesh."""
 
-from typing import Any as _Any
-
 import numpy as _np
 
 from beamme.core.conf import bme as _bme
@@ -86,56 +84,6 @@ class NURBSPatch(_Element):
             polynomial_order = self.polynomial_orders[i_dim]
             n_cp_per_dim.append(knot_vector_size - polynomial_order - 1)
         return n_cp_per_dim
-
-    def dump_element_specific_section(self, input_file) -> None:
-        """Set the knot vectors of the NURBS patch in the input file."""
-
-        patch_data: dict[str, _Any] = {
-            "KNOT_VECTORS": [],
-        }
-
-        for dir_manifold in range(self.get_nurbs_dimension()):
-            knotvector = self.knot_vectors[dir_manifold]
-            num_knots = len(knotvector)
-
-            # Check the type of knot vector, in case that the multiplicity of the first and last
-            # knot vectors is not p + 1, then it is a closed (periodic) knot vector, otherwise it
-            # is an open (interpolated) knot vector.
-            knotvector_type = "Interpolated"
-
-            for i in range(self.polynomial_orders[dir_manifold] - 1):
-                if (abs(knotvector[i] - knotvector[i + 1]) > _bme.eps_knot_vector) or (
-                    abs(knotvector[num_knots - 2 - i] - knotvector[num_knots - 1 - i])
-                    > _bme.eps_knot_vector
-                ):
-                    knotvector_type = "Periodic"
-                    break
-
-            patch_data["KNOT_VECTORS"].append(
-                {
-                    "DEGREE": self.polynomial_orders[dir_manifold],
-                    "TYPE": knotvector_type,
-                    "KNOTS": [
-                        knot_vector_val
-                        for knot_vector_val in self.knot_vectors[dir_manifold]
-                    ],
-                }
-            )
-
-        if "STRUCTURE KNOTVECTORS" in input_file:
-            # Get all existing patches in the input file - they will be added to the
-            # input file again at the end of this function. By doing it this way, the
-            # FourCIPP type converter will be applied to the current patch.
-            # This also means that we apply the type converter again already existing
-            # patches. But, with the usual number of patches and data size, this
-            # should not lead to a measurable performance impact.
-            patches = input_file.pop("STRUCTURE KNOTVECTORS")["PATCHES"]
-        else:
-            patches = []
-
-        patch_data["ID"] = self.i_nurbs_patch + 1
-        patches.append(patch_data)
-        input_file.add({"STRUCTURE KNOTVECTORS": {"PATCHES": patches}})
 
     def get_number_elements(self) -> int:
         """Determine the number of elements in this patch by checking the
