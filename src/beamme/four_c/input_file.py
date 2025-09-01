@@ -35,6 +35,7 @@ from beamme.core.boundary_condition import BoundaryCondition as _BoundaryConditi
 from beamme.core.conf import INPUT_FILE_HEADER as _INPUT_FILE_HEADER
 from beamme.core.conf import bme as _bme
 from beamme.core.coupling import Coupling as _Coupling
+from beamme.core.element_volume import VolumeElement as _VolumeElement
 from beamme.core.function import Function as _Function
 from beamme.core.geometry_set import GeometrySet as _GeometrySet
 from beamme.core.geometry_set import GeometrySetNodes as _GeometrySetNodes
@@ -44,12 +45,14 @@ from beamme.core.node import Node as _Node
 from beamme.core.nurbs_patch import NURBSPatch as _NURBSPatch
 from beamme.four_c.input_file_dump import dump_coupling as _dump_coupling
 from beamme.four_c.input_file_dump import dump_geometry_set as _dump_geometry_set
+from beamme.four_c.input_file_dump import dump_node as _dump_node
 from beamme.four_c.input_file_dump import (
     dump_nurbs_patch_elements as _dump_nurbs_patch_elements,
 )
 from beamme.four_c.input_file_dump import (
     dump_nurbs_patch_knotvectors as _dump_nurbs_patch_knotvectors,
 )
+from beamme.four_c.input_file_dump import dump_solid_element as _dump_solid_element
 from beamme.four_c.input_file_mappings import (
     INPUT_FILE_MAPPINGS as _INPUT_FILE_MAPPINGS,
 )
@@ -308,6 +311,10 @@ class InputFile(_FourCInput):
             for item in data_list:
                 if hasattr(item, "dump_to_list"):
                     list.append(item.dump_to_list())
+                elif isinstance(item, _Node):
+                    list.append(_dump_node(item))
+                elif isinstance(item, _VolumeElement):
+                    list.append(_dump_solid_element(item))
                 elif isinstance(item, _GeometrySet) or isinstance(
                     item, _GeometrySetNodes
                 ):

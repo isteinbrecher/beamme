@@ -25,10 +25,47 @@ from typing import Any as _Any
 
 from beamme.core.conf import bme as _bme
 from beamme.core.geometry_set import GeometrySetBase
+from beamme.core.node import ControlPoint as _ControlPoint
+from beamme.core.node import Node as _Node
 from beamme.core.nurbs_patch import NURBSSurface as _NURBSSurface
 from beamme.core.nurbs_patch import NURBSVolume as _NURBSVolume
 from beamme.four_c.four_c_types import BeamType as _BeamType
+from beamme.four_c.input_file_mappings import (
+    ELEMENT_TYPE_TO_FOUR_C_STRING as _ELEMENT_TYPE_TO_FOUR_C_STRING,
+)
 from beamme.four_c.input_file_mappings import GEOMETRY_SET_NAMES as _GEOMETRY_SET_NAMES
+
+
+def dump_node(node):
+    """Return the representation of a node in the 4C input file."""
+
+    if isinstance(node, _ControlPoint):
+        return {
+            "id": node.i_global + 1,
+            "COORD": node.coordinates,
+            "data": {"type": "CP", "weight": node.weight},
+        }
+    elif isinstance(node, _Node):
+        return {
+            "id": node.i_global + 1,
+            "COORD": node.coordinates,
+            "data": {"type": "NODE"},
+        }
+    else:
+        raise TypeError(f"Got unexpected item of type {type(node)}")
+
+
+def dump_solid_element(solid_element):
+    """Return a dict with the items representing the given solid element."""
+
+    return {
+        "id": solid_element.i_global + 1,
+        "cell": {
+            "type": _ELEMENT_TYPE_TO_FOUR_C_STRING[type(solid_element)],
+            "connectivity": solid_element.nodes,
+        },
+        "data": solid_element.data,
+    }
 
 
 def dump_coupling(coupling):
