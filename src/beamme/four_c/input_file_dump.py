@@ -24,9 +24,11 @@
 from typing import Any as _Any
 
 from beamme.core.conf import bme as _bme
+from beamme.core.geometry_set import GeometrySetBase
 from beamme.core.nurbs_patch import NURBSSurface as _NURBSSurface
 from beamme.core.nurbs_patch import NURBSVolume as _NURBSVolume
 from beamme.four_c.four_c_types import BeamType as _BeamType
+from beamme.four_c.input_file_mappings import GEOMETRY_SET_NAMES as _GEOMETRY_SET_NAMES
 
 
 def dump_coupling(coupling):
@@ -61,6 +63,26 @@ def dump_coupling(coupling):
         data = element_type.get_coupling_dict(coupling.data)
 
     return {"E": coupling.geometry_set.i_global + 1, **data}
+
+
+def dump_geometry_set(geometry_set: GeometrySetBase):
+    """Return a list with the data describing this set."""
+
+    # Sort nodes based on their global index
+    nodes = sorted(geometry_set.get_all_nodes(), key=lambda n: n.i_global)
+
+    if not nodes:
+        raise ValueError("Writing empty geometry sets is not supported")
+
+    return [
+        {
+            "type": "NODE",
+            "node_id": node.i_global + 1,
+            "d_type": _GEOMETRY_SET_NAMES[geometry_set.geometry_type],
+            "d_id": geometry_set.i_global + 1,
+        }
+        for node in nodes
+    ]
 
 
 def dump_nurbs_patch_knotvectors(input_file, nurbs_patch) -> None:

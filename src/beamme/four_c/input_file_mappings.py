@@ -97,3 +97,11 @@ INPUT_FILE_MAPPINGS: dict[str, _Any] = {
     "n_nodes_to_cell_type": {2: "LINE2", 3: "LINE3"},
     "n_nodes_to_node_ordering": {2: [0, 1], 3: [0, 2, 1]},
 }
+
+
+GEOMETRY_SET_NAMES = {
+    _bme.geo.point: "DNODE",
+    _bme.geo.line: "DLINE",
+    _bme.geo.surface: "DSURFACE",
+    _bme.geo.volume: "DVOL",
+}

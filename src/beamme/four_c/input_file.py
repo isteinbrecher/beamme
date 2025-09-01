@@ -43,6 +43,7 @@ from beamme.core.mesh import Mesh as _Mesh
 from beamme.core.node import Node as _Node
 from beamme.core.nurbs_patch import NURBSPatch as _NURBSPatch
 from beamme.four_c.input_file_dump import dump_coupling as _dump_coupling
+from beamme.four_c.input_file_dump import dump_geometry_set as _dump_geometry_set
 from beamme.four_c.input_file_dump import (
     dump_nurbs_patch_elements as _dump_nurbs_patch_elements,
 )
@@ -305,14 +306,14 @@ class InputFile(_FourCInput):
             list = []
 
             for item in data_list:
-                if isinstance(item, _GeometrySet) or isinstance(
+                if hasattr(item, "dump_to_list"):
+                    list.append(item.dump_to_list())
+                elif isinstance(item, _GeometrySet) or isinstance(
                     item, _GeometrySetNodes
                 ):
-                    list.extend(item.dump_to_list())
+                    list.extend(_dump_geometry_set(item))
                 elif isinstance(item, _NURBSPatch):
                     list.extend(_dump_nurbs_patch_elements(item))
-                elif hasattr(item, "dump_to_list"):
-                    list.append(item.dump_to_list())
                 elif isinstance(item, _BoundaryCondition):
                     list.append(
                         {
