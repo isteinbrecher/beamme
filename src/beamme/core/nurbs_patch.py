@@ -21,6 +21,8 @@
 # THE SOFTWARE.
 """This module implements NURBS patches for the mesh."""
 
+from typing import Iterator as _Iterator
+
 import numpy as _np
 
 from beamme.core.conf import bme as _bme
@@ -128,74 +130,31 @@ class NURBSSurface(NURBSPatch):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def dump_to_list(self):
-        """Return a list with all the element definitions contained in this
-        patch."""
+    def _get_knot_span_iterator(self) -> _Iterator[tuple[int, ...]]:
+        """Return a tuple with the knot spans for this patch."""
 
-        # Check the material
-        self._check_material()
+        p, q = self.polynomial_orders
+        kv_u, kv_v = self.knot_vectors[:2]
+        return (
+            (u, v)
+            for v in range(q, len(kv_v) - q - 1)
+            for u in range(p, len(kv_u) - p - 1)
+        )
 
-        # Calculate how many control points are on the u direction
-        ctrlpts_size_u = len(self.knot_vectors[0]) - self.polynomial_orders[0] - 1
+    def _get_ids_ctrlpts(self, knot_span_u: int, knot_span_v: int) -> list[int]:
+        """Compute the global indices of the control points that influence the
+        element defined by the given knot span."""
 
-        def get_ids_ctrlpts_surface(knot_span_u, knot_span_v):
-            """For an interpolated patch, calculate control points involved in
-            evaluation of the surface point at the knot span (knot_span_u,
-            knot_span_v)"""
+        p, q = self.polynomial_orders
+        ctrlpts_size_u = len(self.knot_vectors[0]) - p - 1
+        id_u = knot_span_u - p
+        id_v = knot_span_v - q
 
-            id_u = knot_span_u - self.polynomial_orders[0]
-            id_v = knot_span_v - self.polynomial_orders[1]
-
-            element_ctrlpts_ids = []
-            for j in range(self.polynomial_orders[1] + 1):
-                for i in range(self.polynomial_orders[0] + 1):
-                    # Calculating the global index of the control point, based on the book
-                    # "Isogeometric Analysis: toward Integration of CAD and FEA" of J. Austin
-                    # Cottrell, p. 314.
-                    index_global = ctrlpts_size_u * (id_v + j) + id_u + i
-                    element_ctrlpts_ids.append(index_global)
-
-            return element_ctrlpts_ids
-
-        patch_elements = []
-
-        # Adding an increment j to self.global to obtain the ID of an element in the patch
-        j = 0
-
-        # Loop over the knot spans to obtain the elements inside the patch
-        for knot_span_v in range(
-            self.polynomial_orders[1],
-            len(self.knot_vectors[1]) - self.polynomial_orders[1] - 1,
-        ):
-            for knot_span_u in range(
-                self.polynomial_orders[0],
-                len(self.knot_vectors[0]) - self.polynomial_orders[0] - 1,
-            ):
-                element_cps_ids = get_ids_ctrlpts_surface(knot_span_u, knot_span_v)
-
-                connectivity = [self.nodes[i] for i in element_cps_ids]
-
-                num_cp_in_element = (self.polynomial_orders[0] + 1) * (
-                    self.polynomial_orders[1] + 1
-                )
-
-                patch_elements.append(
-                    {
-                        "id": self.i_global + j + 1,
-                        "cell": {
-                            "type": f"NURBS{num_cp_in_element}",
-                            "connectivity": connectivity,
-                        },
-                        "data": {
-                            "type": "WALLNURBS",
-                            "MAT": self.material,
-                            **(self.data if self.data else {}),
-                        },
-                    }
-                )
-                j += 1
-
-        return patch_elements
+        return [
+            ctrlpts_size_u * (id_v + j) + id_u + i
+            for j in range(q + 1)
+            for i in range(p + 1)
+        ]
 
 
 class NURBSVolume(NURBSPatch):
@@ -204,88 +163,34 @@ class NURBSVolume(NURBSPatch):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def dump_to_list(self):
-        """Return a list with all the element definitions contained in this
-        patch."""
+    def _get_knot_span_iterator(self) -> _Iterator[tuple[int, ...]]:
+        """Return a tuple with the knot spans for this patch."""
 
-        # Check the material
-        self._check_material()
+        p, q, r = self.polynomial_orders
+        kv_u, kv_v, kv_w = self.knot_vectors
+        return (
+            (u, v, w)
+            for w in range(r, len(kv_w) - r - 1)
+            for v in range(q, len(kv_v) - q - 1)
+            for u in range(p, len(kv_u) - p - 1)
+        )
 
-        # Calculate how many control points are on the u and v directions
-        ctrlpts_size_u = len(self.knot_vectors[0]) - self.polynomial_orders[0] - 1
-        ctrlpts_size_v = len(self.knot_vectors[1]) - self.polynomial_orders[1] - 1
+    def _get_ids_ctrlpts(
+        self, knot_span_u: int, knot_span_v: int, knot_span_w: int
+    ) -> list[int]:
+        """Compute the global indices of the control points that influence the
+        element defined by the given knot span."""
 
-        def get_ids_ctrlpts_volume(knot_span_u, knot_span_v, knot_span_w):
-            """For an interpolated patch, calculate control points involved in
-            evaluation of the surface point at the knot span (knot_span_u,
-            knot_span_v, knot_span_w)"""
+        p, q, r = self.polynomial_orders
+        id_u = knot_span_u - p
+        id_v = knot_span_v - q
+        id_w = knot_span_w - r
+        size_u = len(self.knot_vectors[0]) - p - 1
+        size_v = len(self.knot_vectors[1]) - q - 1
 
-            id_u = knot_span_u - self.polynomial_orders[0]
-            id_v = knot_span_v - self.polynomial_orders[1]
-            id_w = knot_span_w - self.polynomial_orders[2]
-
-            element_ctrlpts_ids = []
-
-            for k in range(self.polynomial_orders[2] + 1):
-                for j in range(self.polynomial_orders[1] + 1):
-                    for i in range(self.polynomial_orders[0] + 1):
-                        # Calculating the global index of the control point, based on the paper
-                        # "Isogeometric analysis: an overview and computer implementation aspects"
-                        # of Vinh-Phu Nguyen, Mathematics and Computers in Simulation, Jun-2015.
-                        index_global = (
-                            ctrlpts_size_u * ctrlpts_size_v * (id_w + k)
-                            + ctrlpts_size_u * (id_v + j)
-                            + id_u
-                            + i
-                        )
-                        element_ctrlpts_ids.append(index_global)
-
-            return element_ctrlpts_ids
-
-        patch_elements = []
-
-        # Adding an increment to self.global to obtain the ID of an element in the patch
-        increment_ele = 0
-
-        # Loop over the knot spans to obtain the elements inside the patch
-        for knot_span_w in range(
-            self.polynomial_orders[2],
-            len(self.knot_vectors[2]) - self.polynomial_orders[2] - 1,
-        ):
-            for knot_span_v in range(
-                self.polynomial_orders[1],
-                len(self.knot_vectors[1]) - self.polynomial_orders[1] - 1,
-            ):
-                for knot_span_u in range(
-                    self.polynomial_orders[0],
-                    len(self.knot_vectors[0]) - self.polynomial_orders[0] - 1,
-                ):
-                    element_cps_ids = get_ids_ctrlpts_volume(
-                        knot_span_u, knot_span_v, knot_span_w
-                    )
-
-                    connectivity = [self.nodes[i] for i in element_cps_ids]
-
-                    num_cp_in_element = (
-                        (self.polynomial_orders[0] + 1)
-                        * (self.polynomial_orders[1] + 1)
-                        * (self.polynomial_orders[2] + 1)
-                    )
-
-                    patch_elements.append(
-                        {
-                            "id": self.i_global + increment_ele + 1,
-                            "cell": {
-                                "type": f"NURBS{num_cp_in_element}",
-                                "connectivity": connectivity,
-                            },
-                            "data": {
-                                "type": "SOLID",
-                                "MAT": self.material,
-                                **(self.data if self.data else {}),
-                            },
-                        }
-                    )
-                    increment_ele += 1
-
-        return patch_elements
+        return [
+            size_u * size_v * (id_w + k) + size_u * (id_v + j) + id_u + i
+            for k in range(r + 1)
+            for j in range(q + 1)
+            for i in range(p + 1)
+        ]

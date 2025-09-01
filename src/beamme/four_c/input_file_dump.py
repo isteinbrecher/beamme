@@ -24,6 +24,8 @@
 from typing import Any as _Any
 
 from beamme.core.conf import bme as _bme
+from beamme.core.nurbs_patch import NURBSSurface as _NURBSSurface
+from beamme.core.nurbs_patch import NURBSVolume as _NURBSVolume
 from beamme.four_c.four_c_types import BeamType as _BeamType
 
 
@@ -110,3 +112,42 @@ def dump_nurbs_patch_knotvectors(input_file, nurbs_patch) -> None:
     patch_data["ID"] = nurbs_patch.i_nurbs_patch + 1
     patches.append(patch_data)
     input_file.add({"STRUCTURE KNOTVECTORS": {"PATCHES": patches}})
+
+
+def dump_nurbs_patch_elements(nurbs_patch):
+    """Return a list with all the element definitions contained in this
+    patch."""
+
+    nurbs_type_to_default_four_c_type = {
+        _NURBSSurface: "WALLNURBS",
+        _NURBSVolume: "SOLID",
+    }
+
+    # Check the material
+    nurbs_patch._check_material()
+
+    patch_elements = []
+    j = 0
+
+    for knot_span in nurbs_patch._get_knot_span_iterator():
+        element_cps_ids = nurbs_patch._get_ids_ctrlpts(*knot_span)
+        connectivity = [nurbs_patch.nodes[i] for i in element_cps_ids]
+        num_cp = len(connectivity)
+
+        patch_elements.append(
+            {
+                "id": nurbs_patch.i_global + j + 1,
+                "cell": {
+                    "type": f"NURBS{num_cp}",
+                    "connectivity": connectivity,
+                },
+                "data": {
+                    "type": nurbs_type_to_default_four_c_type[type(nurbs_patch)],
+                    "MAT": nurbs_patch.material,
+                    **(nurbs_patch.data if nurbs_patch.data else {}),
+                },
+            }
+        )
+        j += 1
+
+    return patch_elements
