@@ -31,20 +31,19 @@ RUN apt-get install -y ffmpeg libsm6 libxext6
 RUN apt-get install -y xvfb libgl1 libglx-mesa0
 
 USER root
-RUN chown ubuntu:ubuntu -R /home/user
+RUN chmod 777 -R /home/user
 
 USER ubuntu
 COPY --chown=ubuntu . /home/ubuntu/beamme
 
 WORKDIR /home/ubuntu
 
-# RUN python3 -m venv beamme-env
-# RUN . beamme-env/bin/activate && pip install --upgrade pip
-
+RUN python3 -m venv beamme-env
+RUN . beamme-env/bin/activate && pip install --upgrade pip
 WORKDIR /home/ubuntu/beamme
 RUN pwd
 RUN ls -l
-# ENV PATH="/home/ubuntu/beamme-env/bin:$PATH"
+ENV PATH="/home/ubuntu/beamme-env/bin:$PATH"
 RUN pip install -e .[fourc,dev]
 RUN pip install --no-cache-dir notebook jupyterlab jupyterhub tame
 RUN pip install pyvista[jupyter] trame ipywidgets
