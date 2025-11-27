@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 ARG BASE_IMAGE_TAG=latest
-FROM ghcr.io/pyvista/pyvista:$BASE_IMAGE_TAG
+FROM ghcr.io/4c-multiphysics/4c:main
 
 USER root
 RUN apt-get upgrade
@@ -28,12 +28,23 @@ RUN apt-get update
 RUN apt-get install -y git
 RUN apt-get install -y build-essential
 RUN apt-get install -y ffmpeg libsm6 libxext6
-RUN apt-get install -y libgl1-mesa-glx xvfb
+RUN apt-get install -y xvfb libgl1 libglx-mesa0
 
-COPY . ${HOME}
 USER root
-RUN chown -R 1000 ${HOME}
-RUN chown -R 1000 ${HOME}/.*
-USER jovyan
-WORKDIR ${HOME}
+RUN chown ubuntu:ubuntu -R /home/user
+
+USER ubuntu
+COPY --chown=ubuntu . /home/ubuntu/beamme
+
+WORKDIR /home/ubuntu
+
+# RUN python3 -m venv beamme-env
+# RUN . beamme-env/bin/activate && pip install --upgrade pip
+
+WORKDIR /home/ubuntu/beamme
+RUN pwd
+RUN ls -l
+# ENV PATH="/home/ubuntu/beamme-env/bin:$PATH"
 RUN pip install -e .[fourc,dev]
+RUN pip install --no-cache-dir notebook jupyterlab jupyterhub tame
+RUN pip install pyvista[jupyter] trame ipywidgets
