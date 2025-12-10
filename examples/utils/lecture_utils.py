@@ -67,6 +67,7 @@ def run_four_c(
         output_energy=False,
         output_strains=True,
     )
+    input_file["IO/RUNTIME VTK OUTPUT/BEAMS"]["MATERIAL_FORCES_GAUSSPOINT"] = True
 
     # Dump the file to disc.
     simulation_directory = Path.cwd() / simulation_name
