@@ -70,8 +70,6 @@ def run_four_c(
 
     # Dump the file to disc.
     simulation_directory = Path.cwd() / simulation_name
-    print(simulation_directory)
-    return
     input_file_path = simulation_directory / f"{simulation_name}.4C.yaml"
     clean_simulation_directory(simulation_directory)
     input_file.dump(input_file_path)
@@ -80,12 +78,9 @@ def run_four_c(
     with open(simulation_directory / f"{simulation_name}.log", "w") as logfile:
         # Command to run 4C
         four_c_exe = "/data/a11bivst/dev/4C/release/4C"
-        command = [
-            four_c_exe,
-            input_file_path.absolute(),
-            "xxx",
-        ]
+        command = [four_c_exe, input_file_path.absolute(), simulation_name]
 
+        # Start simulation
         print("Start simulation")
         process = subprocess.Popen(
             command,
@@ -96,19 +91,20 @@ def run_four_c(
             cwd=simulation_directory,
         )
 
+        # Process the output line by line
         nonlinear_solver_step_count = 0
         is_error = False
         finished = False
         for line in process.stdout:
             line = line.rstrip("\n")
 
-            # 2) Write to log file
+            # Write line to logfile
             logfile.write(line + "\n")
 
-            # 3) Flush file so log is always up to date
+            # Flush file so log is always up to date
             logfile.flush()
 
-            # 4) Process the line however you want
+            # Process the line however you want
             if "Nonlinear Solver Step" in line:
                 nonlinear_solver_step_count = int(line.split(" ")[4])
             elif "||F||" in line:
@@ -136,4 +132,4 @@ def run_four_c(
             if is_error:
                 print(line)
 
-        returncode = process.wait()
+        _return_code = process.wait()
