@@ -1,6 +1,0 @@
-formats = "py:percent"
-default_jupytext_formats = "py:percent"
-
-# Keep the committed file clean
-cell_metadata_filter = "-all"
-notebook_metadata_filter = "-all"
