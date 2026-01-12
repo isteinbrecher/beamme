@@ -21,12 +21,17 @@
 # THE SOFTWARE.
 """This file contains utility functions for the first example."""
 
+# We need to import vtk before pyvista for the TeX labels to work
+import vtk  # noqa: F401, I001
+
 import numpy as np
 import pyvista as pv
+import sys
 
 from beamme.utils.environment import is_testing
 
-from .general_utils import reset_print_out
+# Import beamme visualization module to setup the proper rendering parameters
+import beamme.utils.visualization  # noqa: F401
 
 
 def print_matrix(name, matrix):
@@ -112,6 +117,10 @@ class PyVistaPlotter:
         self.args = args
         self.kwargs = kwargs
 
+        # PyVista changes the printout, so store the original print out
+        # and restore it when done.
+        self.stdout = sys.stdout
+
     def __enter__(self):
         """Return the plotter with the given arguments."""
 
@@ -126,4 +135,4 @@ class PyVistaPlotter:
         """
         if not is_testing():
             self.plotter.show()
-        reset_print_out()
+        sys.stdout = self.stdout

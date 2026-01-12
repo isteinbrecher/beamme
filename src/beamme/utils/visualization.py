@@ -30,7 +30,12 @@ import pyvista as _pv
 from IPython.display import IFrame as _IFrame
 from IPython.display import display as _display
 
+from beamme.utils.environment import is_mybinder as _is_mybinder
 from beamme.utils.environment import is_nbsphinx as _is_nbsphinx
+
+# Start virtual framebuffer for MyBinder environments
+if _is_mybinder():
+    _pv.start_xvfb()
 
 
 def show_plotter(plotter: _pv.Plotter) -> None:
