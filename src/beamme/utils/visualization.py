@@ -27,6 +27,7 @@ from pathlib import Path as _Path
 
 import ipywidgets as _widgets
 import pyvista as _pv
+from IPython.display import HTML as _HTML
 from IPython.display import IFrame as _IFrame
 from IPython.display import display as _display
 
@@ -38,13 +39,18 @@ if _is_mybinder():
     _pv.start_xvfb()
 
 
-def show_plotter(plotter: _pv.Plotter) -> None:
+def show_plotter(plotter: _pv.Plotter, *, nbsphinx_export_3d_view: bool = True) -> None:
     """Show a PyVista plotter.
 
     This wrapper either directly displays the plotter, default
     development use for BeamMe. For the website representation of the
     examples, we export static and interactive versions of the plotter
     that will be embedded in the documentation.
+
+    Args:
+        plotter: The PyVista plotter to show.
+        nbsphinx_export_3d_view: For nbsphinx documentation, whether to
+            export an interactive 3D view alongside the static image.
     """
 
     if not _is_nbsphinx():
@@ -56,27 +62,31 @@ def show_plotter(plotter: _pv.Plotter) -> None:
         # Get a unique identifier for the current plotter
         plotter_uid = str(_uuid.uuid4().hex)
 
-        # Export screenshot and html representation of the plotter
-        plotter.export_html(static_doc_path / f"{plotter_uid}.html")
+        # Export a screenshot of the plotter
         plotter.screenshot(static_doc_path / f"{plotter_uid}.png")
-
-        # Setup the html to display on the website
         static_frame_html = f"""
-                <img src="../_static/pyvista/{plotter_uid}.png"
-                    style="max-width:100%; border-radius:8px;">
-                """
-        interactive_frame = _IFrame(
-            src=f"../_static/pyvista/{plotter_uid}.html",
-            width="100%",
-            height=600,
-        )
-        tab = _widgets.Tab(
-            children=[
-                _widgets.HTML(static_frame_html),
-                _widgets.HTML(interactive_frame._repr_html_()),
-            ]
-        )
-        tab.set_title(0, "Static Scene")
-        tab.set_title(1, "Interactive Scene")
+            <img src="../_static/pyvista/{plotter_uid}.png"
+                style="max-width:100%; border-radius:8px;">
+            """
 
-        _display(tab)
+        if nbsphinx_export_3d_view:
+            # Export a html representation of the plotter
+            plotter.export_html(static_doc_path / f"{plotter_uid}.html")
+
+            interactive_frame = _IFrame(
+                src=f"../_static/pyvista/{plotter_uid}.html",
+                width="100%",
+                height=600,
+            )
+            tab = _widgets.Tab(
+                children=[
+                    _widgets.HTML(static_frame_html),
+                    _widgets.HTML(interactive_frame._repr_html_()),
+                ]
+            )
+            tab.set_title(0, "Static Scene")
+            tab.set_title(1, "Interactive Scene")
+
+            _display(tab)
+        else:
+            _display(_HTML(static_frame_html))

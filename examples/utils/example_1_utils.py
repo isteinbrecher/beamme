@@ -29,9 +29,7 @@ import pyvista as pv
 import sys
 
 from beamme.utils.environment import is_testing
-
-# Import beamme visualization module to setup the proper rendering parameters
-import beamme.utils.visualization  # noqa: F401
+import beamme.utils.visualization as visualization
 
 
 def print_matrix(name, matrix):
@@ -134,5 +132,5 @@ class PyVistaPlotter:
         console print out).
         """
         if not is_testing():
-            self.plotter.show()
+            visualization.show_plotter(self.plotter, nbsphinx_export_3d_view=False)
         sys.stdout = self.stdout
