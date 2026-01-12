@@ -37,7 +37,8 @@ def prepare_docs():
 
     # create directory which contains all the markdown files
     markdown_dir = Path("website/docs/source/md")
-    shutil.rmtree(markdown_dir)
+    if markdown_dir.exists():
+        shutil.rmtree(markdown_dir)
     os.makedirs(markdown_dir, exist_ok=True)
 
     # copy readme
@@ -46,7 +47,8 @@ def prepare_docs():
     # create directory which contains all the example files
     examples_source_dir = Path("examples")
     examples_target_dir = Path("website/docs/source/examples")
-    shutil.rmtree(examples_target_dir)
+    if examples_target_dir.exists():
+        shutil.rmtree(examples_target_dir)
     file_extensions_to_copy = {".ipynb", ".py"}
     for file in examples_source_dir.rglob("*"):
         if file.is_file() and file.suffix.lower() in file_extensions_to_copy:
