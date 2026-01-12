@@ -36,6 +36,9 @@ jobs:
           python website/docs/prepare_docs.py
       - name: Build Sphinx website
         run: |
+          export PYVISTA_OFF_SCREEN=true
+          export PYVISTA_USE_EGL=true
+          export VTK_DEFAULT_RENDER_WINDOW_OFFSCREEN=1
           sphinx-build -b html website/docs/source website/docs/build
       - name: Upload website artifact
         uses: actions/upload-artifact@v4
