@@ -70,13 +70,16 @@ class _ArcLengthEvaluation:
                 lead to higher accuracy.
             method:
                 Method to use for evaluation of nodal positions along the curve:
-                - "arc-length": Uniform spacing along the arc-length of the curve. This means that
-                    elements along a curve will have equal length in space.
+                - "arc-length": Uniform spacing along the arc-length of the curve. This means
+                    that elements along a curve will have equal length in space.
                 - "parametric": Uniform spacing along the parameter coordinate of the curve.
-                    This means that elements along a curve will have equal length in parameter space,
-                    but not necessarily in physical space.
+                    This means that elements along a curve will have equal length in parameter
+                    space, but not necessarily in physical space.
                 - "parametric_consistent_middle_nodes": Same as `parametric`, but middle nodes
-                    are adjusted to be consistent with the arc-length mapping. This means that we might have non-uniform elements along the curve, each element itself is not distorted, as the middle nodes are placed along the arc-length of the individual element in physical space.
+                    are adjusted to be consistent with the arc-length mapping. This means that
+                    we might have non-uniform elements along the curve, each element itself is
+                    not distorted, as the middle nodes are placed along the arc-length of the
+                    individual element in physical space.
         """
 
         self.ds = ds
