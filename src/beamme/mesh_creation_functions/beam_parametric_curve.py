@@ -75,11 +75,11 @@ class _ArcLengthEvaluation:
                 - "parametric": Uniform spacing along the parameter coordinate of the curve.
                     This means that elements along a curve will have equal length in parameter
                     space, but not necessarily in physical space.
-                - "parametric_consistent_middle_nodes": Same as `parametric`, but middle nodes
-                    are adjusted to be consistent with the arc-length mapping. This means that
-                    we might have non-uniform elements along the curve, each element itself is
-                    not distorted, as the middle nodes are placed along the arc-length of the
-                    individual element in physical space.
+                - "parametric_consistent_middle_nodes": Same as `parametric`, but element
+                    middle nodes are adjusted to be consistent with the arc-length mapping.
+                    This means that elements along a curve will have equal length in parameter
+                    space, but the middle nodes are placed such that the elements themselves are
+                    not distorted.
         """
 
         self.ds = ds
