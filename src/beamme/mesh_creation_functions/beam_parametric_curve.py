@@ -225,7 +225,7 @@ def create_beam_mesh_parametric_curve(
     output_length: bool | None = False,
     function_derivative: _Callable | None = None,
     function_rotation: _Callable | None = None,
-    arc_length_integrator_kwargs: dict = {},
+    arc_length_integrator_kwargs: dict | None = None,
     **kwargs,
 ) -> _GeometryName | tuple[_GeometryName, float]:
     """Generate a beam from a parametric curve. Integration along the beam is
@@ -280,6 +280,10 @@ def create_beam_mesh_parametric_curve(
         Set with the 'start' and 'end' node of the curve. Also a 'line' set
         with all nodes of the curve.
     """
+
+    # Set default values for optional arguments.
+    if arc_length_integrator_kwargs is None:
+        arc_length_integrator_kwargs = {}
 
     # To avoid issues with automatic differentiation, we need to ensure that the interval
     # values are of type float.
