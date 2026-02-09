@@ -21,29 +21,19 @@
 # THE SOFTWARE.
 """Create a beam filament from a curve represented with splinepy."""
 
-import numpy as _np
-
-from beamme.core.conf import bme as _bme
 from beamme.mesh_creation_functions.beam_parametric_curve import (
     create_beam_mesh_parametric_curve as _create_beam_mesh_parametric_curve,
 )
 
 
-def get_curve_function_and_jacobian_for_integration(curve, tol: float | None = None):
+def get_curve_function_and_jacobian_for_integration(curve):
     """Return function objects for evaluating the curve and the derivative.
-    These functions are used in the curve integration. It can happen that the
-    integration algorithm has to evaluate the curve outside of the defined
-    domain. This usually leads to errors in common spline/NURBS packages.
-    Therefore, we check for this evaluation outside of the parameter domain
-    here and perform a linear extrapolation.
+    These functions are used in the curve integration.
 
     Args
     ----
     curve: splinepy object
         Curve that is used to describe the beam centerline.
-    tol: float
-        Tolerance for checking if point is close to the start or end of the
-        interval. If None is given, use the default tolerance from bme.
 
     Return
     ----
@@ -58,9 +48,6 @@ def get_curve_function_and_jacobian_for_integration(curve, tol: float | None = N
             Parameter coordinate for the end for the curve
     """
 
-    if tol is None:
-        tol = _bme.eps_pos
-
     curve_start = curve.parametric_bounds[0][0]
     curve_end = curve.parametric_bounds[1][0]
 
@@ -72,45 +59,10 @@ def get_curve_function_and_jacobian_for_integration(curve, tol: float | None = N
         """Evaluate the derivative along the curve."""
         return curve.derivative([[t]], orders=[1])[0]
 
-    def function(t):
-        """Convert the curve to a function that can be used for beam
-        generation."""
-
-        if curve_start <= t <= curve_end:
-            return eval_r(t)
-        elif t < curve_start and _np.abs(t - curve_start) < tol:
-            diff = t - curve_start
-            return eval_r(curve_start) + diff * eval_rp(curve_start)
-        elif t > curve_end and _np.abs(t - curve_end) < tol:
-            diff = t - curve_end
-            return eval_r(curve_end) + diff * eval_rp(curve_end)
-        raise ValueError(
-            "Can not evaluate the curve function outside of the interval (plus tolerances).\n"
-            f"Abs diff start: {_np.abs(curve_start - t)}\nAbs diff end: {_np.abs(t - curve_end)}"
-        )
-
-    def jacobian(t):
-        """Convert the curve to a Jacobian function that can be used for
-        integration along the curve.
-
-        There is no tolerance here, since the integration algorithms
-        sometimes evaluates the derivative far outside the interval.
-        """
-
-        if curve_start <= t <= curve_end:
-            return eval_rp(t)
-        elif t < curve_start:
-            return eval_rp(curve_start)
-        elif curve_end < t:
-            return eval_rp(curve_end)
-        raise ValueError("Should not happen")
-
-    return function, jacobian, curve_start, curve_end
+    return eval_r, eval_rp, curve_start, curve_end
 
 
-def create_beam_mesh_from_splinepy(
-    mesh, beam_class, material, curve, *, tol=None, **kwargs
-):
+def create_beam_mesh_from_splinepy(mesh, beam_class, material, curve, **kwargs):
     """Generate a beam from a splinepy curve.
 
     Args
@@ -123,9 +75,6 @@ def create_beam_mesh_from_splinepy(
         Material for this line.
     curve: splinepy object
         Curve that is used to describe the beam centerline.
-    tol: float
-        Tolerance for checking if point is close to the start or end of the
-        interval. If None is given, use the default tolerance from bme.
 
     **kwargs (for all of them look into create_beam_mesh_function)
     ----
@@ -146,7 +95,7 @@ def create_beam_mesh_from_splinepy(
         jacobian,
         curve_start,
         curve_end,
-    ) = get_curve_function_and_jacobian_for_integration(curve, tol=tol)
+    ) = get_curve_function_and_jacobian_for_integration(curve)
 
     # Create the beams
     return _create_beam_mesh_parametric_curve(

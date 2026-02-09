@@ -33,19 +33,14 @@ def test_beamme_mesh_creation_functions_beam_splinepy_function_and_jacobian(
     create_beam_mesh_from_splinepy function."""
 
     curve = get_splinepy_object("curve_nurbs")
-    r, dr, _, _ = get_curve_function_and_jacobian_for_integration(curve, tol=10)
+    r, dr, _, _ = get_curve_function_and_jacobian_for_integration(curve)
 
-    t_values = [5.0 / 7.0, -0.3, 1.2]
+    t_values = [0.5, 5.0 / 7.0]
     results_r = [
+        [1.0, 1.0, -0.5],
         [1.4285714285714286, 0.8163265306122449, -0.4081632653061225],
-        [-0.6, -1.2, 0.6],
-        [2.4, -0.8, 0.4],
     ]
-    results_dr = [
-        [2.0, -1.7142857142857144, 0.8571428571428572],
-        [2.0, 4.0, -2.0],
-        [2.0, -4.0, 2.0],
-    ]
+    results_dr = [[2.0, 0.0, 0.0], [2.0, -1.7142857142857144, 0.8571428571428572]]
 
     for t, result_r, result_dr in zip(t_values, results_r, results_dr):
         assert_results_close(r(t), result_r)

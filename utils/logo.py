@@ -935,7 +935,7 @@ def create_curve(curve, **kwargs):
     # BeamMe curve integration to fail. We scale the knot span here, such
     # that the Jacobian is continuous.
     _, jacobian, _, curve_end = get_curve_function_and_jacobian_for_integration(
-        curve_tmp, tol=1
+        curve_tmp
     )
     n_seg = int(np.round(curve_end))
     if isinstance(curve_tmp, splinepy.BSpline):
@@ -952,7 +952,7 @@ def create_curve(curve, **kwargs):
         curve_tmp.knot_vectors = [knot_scaled]
 
     _, length = create_beam_mesh_from_splinepy(
-        mesh, Beam2, MaterialBeamBase(), curve_tmp, tol=10, output_length=True, **kwargs
+        mesh, Beam2, MaterialBeamBase(), curve_tmp, output_length=True, **kwargs
     )
     return mesh, length
 
