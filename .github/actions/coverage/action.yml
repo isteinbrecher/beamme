@@ -13,7 +13,7 @@ runs:
       run: |
         cd ${GITHUB_WORKSPACE}
         mkdir -p coverage-badge
-        coverage-badge -o coverage-badge/coverage_badge.svg
+        genbadge coverage -i coverage.xml -o coverage-badge/coverage_badge.svg
         cp .github/actions/coverage/coverage_badge_index.html coverage-badge/index.html
     - name: Upload coverage badge
       uses: actions/upload-artifact@v6

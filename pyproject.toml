@@ -38,8 +38,8 @@ local_scheme = "no-local-version"
 cubitpy = ["cubitpy"]
 fourc = ["fourcipp"]
 dev = [
-  "coverage-badge",
   "coverage",
+  "genbadge[coverage]",
   "pdoc",
   "pre-commit",
   "pytest",
@@ -64,7 +64,7 @@ omit = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-p pytest_cov --cov-report=term --cov-report=html --cov-fail-under=90 --cov=src/beamme/"
+addopts = "-p pytest_cov --cov-report=term --cov-report=html --cov-report=xml --cov-fail-under=90 --cov=src/beamme/"
 markers = [
   "fourc: tests in combination with 4C",
   "arborx: tests in combination with ArborX",
