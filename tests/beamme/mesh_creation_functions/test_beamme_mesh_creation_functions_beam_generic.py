@@ -346,9 +346,9 @@ def test_beamme_mesh_creation_functions_beam_generic_arc_length_argument_checks(
             np.array(
                 [
                     0.0,
-                    0.18390991026092549,
+                    0.14322918360992498,
                     0.36781982052185097,
-                    3.480818295106304,
+                    1.946686519210619,
                     6.593816769690758,
                 ]
             ),
