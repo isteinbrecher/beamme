@@ -33,6 +33,9 @@ from beamme.core.rotation import Rotation
 from beamme.mesh_creation_functions.beam_arc import create_beam_mesh_arc_segment_2d
 from beamme.mesh_creation_functions.beam_generic import create_beam_mesh_generic
 from beamme.mesh_creation_functions.beam_line import create_beam_mesh_line
+from beamme.mesh_creation_functions.beam_parametric_curve import (
+    create_beam_mesh_parametric_curve,
+)
 
 
 def test_beamme_mesh_creation_functions_beam_generic_start_end_node_error(
@@ -333,11 +336,43 @@ def test_beamme_mesh_creation_functions_beam_generic_arc_length_argument_checks(
 
 
 @pytest.mark.parametrize(
-    "basic_creation_function",
-    ["line", "arc"],
+    "basic_creation_function,arc_length_ref",
+    (
+        ("arc", None),
+        ("line", None),
+        ("parametric_curve_arc-length", None),
+        (
+            "parametric_curve_parametric",
+            np.array(
+                [
+                    0.0,
+                    0.18390991026092549,
+                    0.36781982052185097,
+                    3.480818295106304,
+                    6.593816769690758,
+                ]
+            ),
+        ),
+        (
+            "parametric_curve_parametric_consistent_middle_nodes",
+            np.array(
+                [
+                    0.0,
+                    0.18390991026092549,
+                    0.36781982052185097,
+                    3.480818295106304,
+                    6.593816769690758,
+                ]
+            ),
+        ),
+    ),
 )
 def test_beamme_mesh_creation_functions_beam_generic_arc_length(
-    basic_creation_function, get_default_test_beam_material, assert_results_close
+    get_parametric_function,
+    basic_creation_function,
+    arc_length_ref,
+    get_default_test_beam_material,
+    assert_results_close,
 ):
     """Test that the arc length can be stored in the nodes when creating a
     filament."""
@@ -345,6 +380,7 @@ def test_beamme_mesh_creation_functions_beam_generic_arc_length(
     node_positions_of_elements = [0, 0.25, 1]
     mat = get_default_test_beam_material(material_type="reissner")
     offset = 3.0
+
     if basic_creation_function == "line":
         length = 2.5
         start_pos = [0, 0, 0]
@@ -389,7 +425,45 @@ def test_beamme_mesh_creation_functions_beam_generic_arc_length(
                 **kwargs,
             )
 
-    arc_length_ref = np.array([0, 0.125, 0.25, 0.625, 1.0]) * length
+    elif basic_creation_function.startswith("parametric_curve_"):
+        arc_length_integration_method = "_".join(basic_creation_function.split("_")[2:])
+
+        length = 6.593816769690758
+        start_pos = [2, 0, 0]
+        end_pos = [-2, 0, 2]
+        start_rot = Rotation.from_rotation_vector(
+            [1.432490763274102, 1.0473349985879405, 1.432490763274102]
+        )
+        end_rot = Rotation.from_rotation_vector(
+            [-1.405448691974458, 1.014988339931174, -1.4449555589051493]
+        )
+
+        R = 2.0
+        tz = 4.0
+        n = 0.5
+
+        def create_beam(mesh, **kwargs):
+            """Wrapper for the common arguments in the call to create the
+            parametric curve beam mesh (helix)."""
+
+            create_beam_mesh_parametric_curve(
+                mesh,
+                Beam3,
+                mat,
+                get_parametric_function(
+                    "helix", R, tz, transformation_factor=2.0, number_of_turns=n
+                ),
+                [0.0, 2.0 * np.pi * n],
+                node_positions_of_elements=node_positions_of_elements,
+                arc_length_integrator_kwargs={"method": arc_length_integration_method},
+                **kwargs,
+            )
+
+    else:
+        raise ValueError(f"Unknown basic_creation_function '{basic_creation_function}'")
+
+    if arc_length_ref is None:
+        arc_length_ref = np.array([0, 0.125, 0.25, 0.625, 1.0]) * length
     arc_length_offset_ref = arc_length_ref + offset
 
     def get_start_and_end_node(*, arc_length_start=None, arc_length_end=None):
