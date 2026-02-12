@@ -51,7 +51,7 @@ class _ArcLengthEvaluation:
 
     def __init__(
         self,
-        ds: _Callable,
+        function_derivative: _Callable,
         interval: tuple[float, float],
         n_intervals: int = 100,
         method: str = "arc-length",
@@ -59,8 +59,8 @@ class _ArcLengthEvaluation:
         """Initialize the arc length evaluator and precomputed samples.
 
         Args:
-            ds:
-                Function that returns the increment along the curve for a given
+            function_derivative:
+                Function that returns the tangent vector along the curve for a given
                 parameter value t.
             interval:
                 Start and end values for the parameter coordinate of the curve,
@@ -82,7 +82,7 @@ class _ArcLengthEvaluation:
                     not distorted.
         """
 
-        self.ds = ds
+        self.function_derivative = function_derivative
         self.interval = interval
         self.n_intervals = n_intervals
         self.method = method
@@ -102,10 +102,8 @@ class _ArcLengthEvaluation:
         self.t_grid = _np.linspace(self.interval[0], self.interval[1], self.n_intervals)
 
         # Evaluate ds at all grid points.
-        # TODO: This could be vectorized for better performance.
-        ds_at_t_samples = _np.empty_like(self.t_grid)
-        for i, t in enumerate(self.t_grid):
-            ds_at_t_samples[i] = self.ds(t)
+        tangents = self.function_derivative(self.t_grid)
+        ds_at_t_samples = _np.linalg.norm(tangents, axis=1)
 
         self.S_grid = _integrate.cumulative_simpson(
             y=ds_at_t_samples, x=self.t_grid, initial=0.0
@@ -225,6 +223,7 @@ def create_beam_mesh_parametric_curve(
     output_length: bool | None = False,
     function_derivative: _Callable | None = None,
     function_rotation: _Callable | None = None,
+    vectorized: bool = False,
     arc_length_integrator_kwargs: dict | None = None,
     **kwargs,
 ) -> _GeometryName | tuple[_GeometryName, float]:
@@ -261,6 +260,10 @@ def create_beam_mesh_parametric_curve(
         is calculated automatically and all subsequent nodal rotations
         are calculated based on a smallest rotation mapping onto the curve
         tangent vector.
+    vectorized:
+        If true, the function and function_derivative are assumed to be
+        vectorized, i.e., they can take arrays of parameter values and return
+        arrays of positions/tangents.
     arc_length_integrator_kwargs:
         Additional arguments for the arc-length integrator.
 
@@ -301,8 +304,33 @@ def create_beam_mesh_parametric_curve(
     if interval_array[0] >= interval_array[1]:
         raise ValueError(f"Interval must be in ascending order, got {interval_array}.")
 
+    # Ensure that the function can be evaluated for multiple values of t at once.
+    if not vectorized:
+        original_function = function
+
+        def function(t_array):
+            """Perform a vectorized evaluation of the function."""
+            return _np.array([original_function(t) for t in t_array])
+
+        if function_derivative is not None:
+            original_function_derivative = function_derivative
+        else:
+            # If no function derivative is given, we can use autograd to compute it. We need to make sure that the
+            # autograd jacobian can also handle vectorized inputs.
+            original_function_derivative = _jacobian(original_function)
+
+        def function_derivative(t_array):
+            """Perform a vectorized evaluation of the function derivative."""
+            return _np.array([original_function_derivative(t) for t in t_array])
+
+    if function_derivative is None:
+        raise ValueError(
+            "Function derivative could not be determined! For vectorized inputs, "
+            "the function derivative must be explicitly provided."
+        )
+
     # Check size and type of position function
-    test_evaluation_of_function = function(interval_array[0])
+    test_evaluation_of_function = function([interval_array[0]])[0]
 
     if len(test_evaluation_of_function) == 2:
         is_3d_curve = False
@@ -311,37 +339,32 @@ def create_beam_mesh_parametric_curve(
     else:
         raise ValueError("Function must return either 2d or 3d curve!")
 
-    if not isinstance(test_evaluation_of_function, _np.ndarray):
-        raise TypeError(
-            "Function return value must be of type np.ndarray, got {}!".format(
-                type(test_evaluation_of_function)
-            )
-        )
-
-    # Get the derivative of the position function and the increment along
-    # the curve.
-    if function_derivative is None:
-        rp = _jacobian(function)
-    else:
-        rp = function_derivative
-
-    def ds(t: float) -> float:
-        """Increment along the curve."""
-        return _np.linalg.norm(rp(t))
-
     # Setup the arc length integration object.
     arc_length_evaluator = _ArcLengthEvaluation(
-        ds, interval_array, **arc_length_integrator_kwargs
+        function_derivative, interval_array, **arc_length_integrator_kwargs
     )
 
     class _BeamFunctionGenerator:
         """This class manages the creation the actual beam nodes and
         rotations."""
 
-        def __init__(self):
+        def __init__(
+            self,
+            interval_array: _np.ndarray,
+            function: _Callable,
+            function_derivative: _Callable,
+            function_rotation: _Callable | None,
+            is_3d_curve: bool,
+        ):
             """Initialize the object and define a starting triad."""
-            if is_3d_curve:
-                r_prime = rp(interval_array[0])
+            self.interval_array = interval_array
+            self.function = function
+            self.function_derivative = function_derivative
+            self.function_rotation = function_rotation
+            self.is_3d_curve = is_3d_curve
+
+            if self.is_3d_curve:
+                r_prime = self.function_derivative([self.interval_array[0]])[0]
                 if abs(_np.dot(r_prime, [0, 0, 1])) < abs(_np.dot(r_prime, [0, 1, 0])):
                     t2_temp = [0, 0, 1]
                 else:
@@ -376,23 +399,22 @@ def create_beam_mesh_parametric_curve(
 
             # Position at S.
             coordinates = _np.zeros((len(evaluation_positions), 3))
-            if is_3d_curve:
-                for i, t in enumerate(t_evaluate):
-                    coordinates[i, :] = function(t)
+            function_evaluation = self.function(t_evaluate)
+            if self.is_3d_curve:
+                coordinates[:, :] = function_evaluation
             else:
-                for i, t in enumerate(t_evaluate):
-                    coordinates[i, :2] = function(t)
+                coordinates[:, :2] = function_evaluation
 
             # Rotation at S.
             rotations = []
-            if function_rotation is not None:
+            if self.function_rotation is not None:
                 for t in t_evaluate:
-                    rotations.append(function_rotation(t))
+                    rotations.append(self.function_rotation(t))
 
             else:
-                for t in t_evaluate:
-                    r_prime = rp(t)
-                    if is_3d_curve:
+                tangents = self.function_derivative(t_evaluate)
+                for r_prime in tangents:
+                    if self.is_3d_curve:
                         # Create the next triad via the smallest rotation mapping based
                         # on the last triad.
                         rot = _smallest_rotation(self.last_created_triad, r_prime)
@@ -411,7 +433,13 @@ def create_beam_mesh_parametric_curve(
         beam_class=beam_class,
         material=material,
         beam_function_evaluate_positions_and_rotations=True,
-        beam_function=_BeamFunctionGenerator(),
+        beam_function=_BeamFunctionGenerator(
+            interval_array,
+            function,
+            function_derivative,
+            function_rotation,
+            is_3d_curve,
+        ),
         interval=(0.0, 1.0),
         interval_length=arc_length_evaluator.approximate_total_arc_length(),
         **kwargs,

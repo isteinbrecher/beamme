@@ -944,8 +944,8 @@ def create_curve(curve, **kwargs):
         knot_scaled = [0.0] * n_double + [1.0] * n_double
         factor_old = 1.0
         for i in range(1, n_seg):
-            last_jacobian = np.linalg.norm(jacobian(i - bme.eps_knot_vector))
-            my_jacobian = np.linalg.norm(jacobian(i + bme.eps_knot_vector))
+            last_jacobian = np.linalg.norm(jacobian([i - bme.eps_knot_vector]))
+            my_jacobian = np.linalg.norm(jacobian([i + bme.eps_knot_vector]))
             factor = factor_old * my_jacobian / last_jacobian
             knot_scaled.extend([knot_scaled[-1] + factor] * n_double)
             factor_old = factor

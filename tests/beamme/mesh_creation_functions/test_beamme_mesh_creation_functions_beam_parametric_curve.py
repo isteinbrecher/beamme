@@ -52,3 +52,28 @@ def test_beamme_mesh_creation_functions_beam_parametric_curve_interval():
         match=re.escape("Interval must be in ascending order, got [1. 0.]."),
     ):
         create_beam_mesh_parametric_curve(None, None, None, None, interval=[1, 0])
+
+
+def test_beamme_mesh_creation_functions_beam_parametric_curve_vectorized():
+    """Check that an error is raised if wrong combination of vectorized
+    functions is given."""
+
+    def function_vectorized(dummy):
+        """A dummy function for testing."""
+        pass
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Function derivative could not be determined! For vectorized inputs, "
+            "the function derivative must be explicitly provided."
+        ),
+    ):
+        create_beam_mesh_parametric_curve(
+            None,
+            None,
+            None,
+            function=function_vectorized,
+            interval=(0, 1),
+            vectorized=True,
+        )
