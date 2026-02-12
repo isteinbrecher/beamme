@@ -89,5 +89,5 @@ def test_performance_mesh_creation_functions_beam_parametric_curve_splinepy(
         function_call_multiple,
         args=(mesh, Beam3, material, nurbs),
         kwargs={"n_el": 50},
-        expected_time=0.55,
+        expected_time=0.3,
     )
