@@ -42,6 +42,5 @@ def test_beamme_mesh_creation_functions_beam_splinepy_function_and_jacobian(
     ]
     results_dr = [[2.0, 0.0, 0.0], [2.0, -1.7142857142857144, 0.8571428571428572]]
 
-    for t, result_r, result_dr in zip(t_values, results_r, results_dr):
-        assert_results_close(r(t), result_r)
-        assert_results_close(dr(t), result_dr)
+    assert_results_close(r(t_values), results_r)
+    assert_results_close(dr(t_values), results_dr)
