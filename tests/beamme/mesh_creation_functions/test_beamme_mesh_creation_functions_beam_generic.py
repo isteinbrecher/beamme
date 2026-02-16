@@ -346,10 +346,10 @@ def test_beamme_mesh_creation_functions_beam_generic_arc_length_argument_checks(
             np.array(
                 [
                     0.0,
-                    0.14322918360992498,
-                    0.36781982052185097,
-                    1.946686519210619,
-                    6.593816769690758,
+                    0.1432291807294664,
+                    0.3678198188308245,
+                    1.9466864902724,
+                    6.5938166349472915,
                 ]
             ),
         ),
@@ -358,10 +358,10 @@ def test_beamme_mesh_creation_functions_beam_generic_arc_length_argument_checks(
             np.array(
                 [
                     0.0,
-                    0.18390991026092549,
-                    0.36781982052185097,
-                    3.480818295106304,
-                    6.593816769690758,
+                    0.18390990941541224,
+                    0.3678198188308245,
+                    3.480818226889058,
+                    6.5938166349472915,
                 ]
             ),
         ),
@@ -428,7 +428,7 @@ def test_beamme_mesh_creation_functions_beam_generic_arc_length(
     elif basic_creation_function.startswith("parametric_curve_"):
         arc_length_integration_method = "_".join(basic_creation_function.split("_")[2:])
 
-        length = 6.593816769690758
+        length = 6.5938166349472915
         start_pos = [2, 0, 0]
         end_pos = [-2, 0, 2]
         start_rot = Rotation.from_rotation_vector(

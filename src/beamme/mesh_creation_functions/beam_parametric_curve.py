@@ -99,7 +99,9 @@ class _ArcLengthEvaluation:
         """
 
         # Uniform grid in t for sampling.
-        self.t_grid = _np.linspace(self.interval[0], self.interval[1], self.n_intervals)
+        self.t_grid = _np.linspace(
+            self.interval[0], self.interval[1], self.n_intervals + 1
+        )
 
         # Evaluate ds at all grid points.
         tangents = self.function_derivative(self.t_grid)

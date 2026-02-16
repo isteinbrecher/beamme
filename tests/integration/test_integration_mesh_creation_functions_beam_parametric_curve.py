@@ -123,7 +123,7 @@ def test_integration_mesh_creation_functions_beam_parametric_curve_3d_helix_leng
 
     # Check the computed length
     assert_results_close(
-        length, 13.187633539381515 if name == "default" else 13.191216930059845
+        length, 13.187633269894581 if name == "default" else 13.187951183407069
     )
 
     # Check that both meshes are equal

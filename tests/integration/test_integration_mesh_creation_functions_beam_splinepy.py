@@ -33,9 +33,9 @@ from beamme.mesh_creation_functions.beam_splinepy import (
 @pytest.mark.parametrize(
     ("splinepy_type", "ref_length"),
     [
-        ("curve_bezier", 5.064502347301837),
-        ("curve_nurbs", 3.140204403683438),
-        ("curve_nurbs_distorted", 12.056886977957966),
+        ("curve_bezier", 5.064502357868928),
+        ("curve_nurbs", 3.140204410040355),
+        ("curve_nurbs_distorted", 12.056885734650654),
     ],
 )
 def test_integration_mesh_creation_functions_beam_splinepy(
