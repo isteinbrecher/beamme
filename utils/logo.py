@@ -952,7 +952,13 @@ def create_curve(curve, **kwargs):
         curve_tmp.knot_vectors = [knot_scaled]
 
     _, length = create_beam_mesh_from_splinepy(
-        mesh, Beam2, MaterialBeamBase(), curve_tmp, output_length=True, **kwargs
+        mesh,
+        Beam2,
+        MaterialBeamBase(),
+        curve_tmp,
+        output_length=True,
+        arc_length_integrator_kwargs={"scipy_integrate": False},
+        **kwargs,
     )
     return mesh, length
 
