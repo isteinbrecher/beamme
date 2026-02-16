@@ -38,11 +38,14 @@ PARAMETRIC_CURVE_TEST_PARAMETRIZATION: tuple = (
     "name,arc_length_integrator_kwargs",
     (
         ("default", {}),
-        ("arc-length", {"method": "arc-length", "n_intervals": 10}),
-        ("parametric", {"method": "parametric", "n_intervals": 10}),
+        ("arc-length", {"method": "arc-length", "n_precomputed_intervals": 10}),
+        ("parametric", {"method": "parametric", "n_precomputed_intervals": 10}),
         (
             "parametric_consistent",
-            {"method": "parametric_consistent_middle_nodes", "n_intervals": 10},
+            {
+                "method": "parametric_consistent_middle_nodes",
+                "n_precomputed_intervals": 10,
+            },
         ),
     ),
 )

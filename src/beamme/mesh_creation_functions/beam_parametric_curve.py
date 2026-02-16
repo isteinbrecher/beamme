@@ -27,6 +27,7 @@ from typing import Type as _Type
 import numpy as _np
 import scipy.integrate as _integrate
 from autograd import jacobian as _jacobian
+from scipy.integrate import quad as _quad
 from scipy.interpolate import interp1d as _interp1d
 
 from beamme.core.element_beam import Beam as _Beam
@@ -53,7 +54,9 @@ class _ArcLengthEvaluation:
         self,
         function_derivative: _Callable,
         interval: tuple[float, float],
-        n_intervals: int = 100,
+        n_precomputed_intervals: int = 100,
+        scipy_integrate: bool = False,
+        scipy_integrate_points: list[float] | None = None,
         method: str = "arc-length",
     ) -> None:
         """Initialize the arc length evaluator and precomputed samples.
@@ -65,9 +68,17 @@ class _ArcLengthEvaluation:
             interval:
                 Start and end values for the parameter coordinate of the curve,
                 must be in ascending order.
-            n_intervals:
-                Number of intervals to use for the precomputation. More intervals
+            n_precomputed_intervals:
+                Number of intervals to use for the pre-computation. More intervals
                 lead to higher accuracy.
+            scipy_integrate:
+                If true, the one single arc length integration is performed with scipy's
+                quad function. This is an adaptive method and gives good estimates on
+                subdivisions of the total interval.
+            scipy_integrate_points:
+                If scipy_integrate is true, this can be used to provide additional points
+                for the adaptive integration. This can be useful if there are known points
+                along the curve where Jacobian has a kink.
             method:
                 Method to use for evaluation of nodal positions along the curve:
                 - "arc-length": Uniform spacing along the arc-length of the curve. This means
@@ -84,7 +95,9 @@ class _ArcLengthEvaluation:
 
         self.function_derivative = function_derivative
         self.interval = interval
-        self.n_intervals = n_intervals
+        self.n_precomputed_intervals = n_precomputed_intervals
+        self.scipy_integrate = scipy_integrate
+        self.scipy_integrate_points = scipy_integrate_points
         self.method = method
 
         self._compute_samples()
@@ -98,18 +111,67 @@ class _ArcLengthEvaluation:
         Simpson integration.
         """
 
-        # Uniform grid in t for sampling.
-        self.t_grid = _np.linspace(
-            self.interval[0], self.interval[1], self.n_intervals + 1
-        )
+        if self.scipy_integrate:
+            ds_dt = lambda t: _np.linalg.norm(self.function_derivative([t])[0])
+            integral = _quad(
+                ds_dt,
+                self.interval[0],
+                self.interval[1],
+                points=self.scipy_integrate_points,
+                full_output=True,
+            )
+            integral_data = integral[2]
+            n_segments = integral_data["last"]
 
-        # Evaluate ds at all grid points.
-        tangents = self.function_derivative(self.t_grid)
-        ds_at_t_samples = _np.linalg.norm(tangents, axis=1)
+            # Sort the segments such that they are in ascending order along the
+            # integration integral.
+            interval_sort = _np.argsort(integral_data["alist"][:n_segments])
+            intervals_integral = integral_data["rlist"][interval_sort]
+            intervals_left_end = integral_data["alist"][interval_sort]
+            intervals_right_end = integral_data["blist"][interval_sort]
 
-        self.S_grid = _integrate.cumulative_simpson(
-            y=ds_at_t_samples, x=self.t_grid, initial=0.0
-        )
+            self.t_grid = _np.zeros(n_segments * self.n_precomputed_intervals + 1)
+            self.S_grid = _np.zeros(n_segments * self.n_precomputed_intervals + 1)
+            local_integral_start = 0.0
+            for i_segment in range(n_segments):
+                segment_a = intervals_left_end[i_segment]
+                segment_b = intervals_right_end[i_segment]
+
+                global_start_index = i_segment * self.n_precomputed_intervals
+                global_end_index = (i_segment + 1) * self.n_precomputed_intervals + 1
+
+                t_local = _np.linspace(
+                    segment_a, segment_b, self.n_precomputed_intervals + 1
+                )
+                self.t_grid[global_start_index:global_end_index] = t_local
+
+                local_integral = intervals_integral[i_segment]
+
+                tangents = self.function_derivative(t_local)
+                ds_at_t_samples = _np.linalg.norm(tangents, axis=1)
+                S_local = _integrate.cumulative_simpson(
+                    y=ds_at_t_samples, x=t_local, initial=0.0
+                )
+                S_local *= local_integral / S_local[-1]
+                S_local += local_integral_start
+
+                self.S_grid[global_start_index:global_end_index] = S_local
+
+                local_integral_start += local_integral
+
+        else:
+            # Uniform grid in t for sampling.
+            self.t_grid = _np.linspace(
+                self.interval[0], self.interval[1], self.n_precomputed_intervals + 1
+            )
+
+            # Evaluate ds at all grid points.
+            tangents = self.function_derivative(self.t_grid)
+            ds_at_t_samples = _np.linalg.norm(tangents, axis=1)
+
+            self.S_grid = _integrate.cumulative_simpson(
+                y=ds_at_t_samples, x=self.t_grid, initial=0.0
+            )
 
     def _compute_interpolation_functions(self) -> None:
         """Setup the interpolation functions for S(t) and t(S)."""
