@@ -55,7 +55,7 @@ class _ArcLengthEvaluation:
         function_derivative: _Callable,
         interval: tuple[float, float],
         n_precomputed_intervals: int = 100,
-        scipy_integrate: bool = False,
+        scipy_integrate: bool = True,
         scipy_integrate_points: list[float] | None = None,
         method: str = "arc-length",
     ) -> None:
@@ -92,6 +92,11 @@ class _ArcLengthEvaluation:
                     space, but the middle nodes are placed such that the elements themselves are
                     not distorted.
         """
+
+        if not scipy_integrate and scipy_integrate_points is not None:
+            raise ValueError(
+                "scipy_integrate_points cannot be provided if scipy_integrate is False!"
+            )
 
         self.function_derivative = function_derivative
         self.interval = interval

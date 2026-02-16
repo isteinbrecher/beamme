@@ -37,7 +37,7 @@ from beamme.mesh_creation_functions.beam_parametric_curve import (
     (
         (
             # No special kwargs, do the default integration
-            {},
+            {"scipy_integrate": False},
             {
                 "arc_length": 19.205966821352146,
                 "t_grid": [0.0, 3.3333333333333335, 6.666666666666667, 10.0],
@@ -216,6 +216,20 @@ def test_beamme_mesh_creation_functions_beam_parametric_curve_arc_length_evaluat
     assert_results_close(arc_length_evaluator.S_grid, ref_results["S_grid"])
     assert_results_close(arc_length_evaluator.S_from_t(t_eval), ref_results["S_from_t"])
     assert_results_close(arc_length_evaluator.t_from_S(S_eval), ref_results["t_from_S"])
+
+
+def test_beamme_mesh_creation_functions_beam_parametric_curve_arc_length_evaluation_arguments():
+    """Check that an error is raised for wrong combination of arguments."""
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "scipy_integrate_points cannot be provided if scipy_integrate is False!"
+        ),
+    ):
+        _ArcLengthEvaluation(
+            None, None, scipy_integrate=False, scipy_integrate_points=[0.5]
+        )
 
 
 def test_beamme_mesh_creation_functions_beam_parametric_curve_interval():

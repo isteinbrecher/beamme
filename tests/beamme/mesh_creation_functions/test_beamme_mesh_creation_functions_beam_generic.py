@@ -455,7 +455,10 @@ def test_beamme_mesh_creation_functions_beam_generic_arc_length(
                 ),
                 [0.0, 2.0 * np.pi * n],
                 node_positions_of_elements=node_positions_of_elements,
-                arc_length_integrator_kwargs={"method": arc_length_integration_method},
+                arc_length_integrator_kwargs={
+                    "method": arc_length_integration_method,
+                    "scipy_integrate": False,
+                },
                 **kwargs,
             )
 

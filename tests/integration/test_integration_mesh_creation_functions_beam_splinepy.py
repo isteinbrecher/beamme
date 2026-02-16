@@ -53,7 +53,13 @@ def test_integration_mesh_creation_functions_beam_splinepy(
     mat = get_default_test_beam_material(material_type="reissner")
     mesh = Mesh()
     _, length = create_beam_mesh_from_splinepy(
-        mesh, Beam3rHerm2Line3, mat, curve, n_el=3, output_length=True
+        mesh,
+        Beam3rHerm2Line3,
+        mat,
+        curve,
+        n_el=3,
+        output_length=True,
+        arc_length_integrator_kwargs={"scipy_integrate": False},
     )
     assert_results_close(ref_length, length)
 
