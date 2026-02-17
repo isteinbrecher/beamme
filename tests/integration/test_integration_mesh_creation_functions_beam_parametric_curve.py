@@ -37,12 +37,30 @@ from beamme.mesh_creation_functions.beam_parametric_curve import (
 PARAMETRIC_CURVE_TEST_PARAMETRIZATION: tuple = (
     "name,arc_length_integrator_kwargs",
     (
-        ("default", {}),
-        ("arc-length", {"method": "arc-length", "n_intervals": 10}),
-        ("parametric", {"method": "parametric", "n_intervals": 10}),
+        ("default", {"scipy_integrate": False}),
+        (
+            "arc-length",
+            {
+                "method": "arc-length",
+                "n_precomputed_intervals": 10,
+                "scipy_integrate": False,
+            },
+        ),
+        (
+            "parametric",
+            {
+                "method": "parametric",
+                "n_precomputed_intervals": 10,
+                "scipy_integrate": False,
+            },
+        ),
         (
             "parametric_consistent",
-            {"method": "parametric_consistent_middle_nodes", "n_intervals": 10},
+            {
+                "method": "parametric_consistent_middle_nodes",
+                "n_precomputed_intervals": 10,
+                "scipy_integrate": False,
+            },
         ),
     ),
 )
@@ -123,7 +141,7 @@ def test_integration_mesh_creation_functions_beam_parametric_curve_3d_helix_leng
 
     # Check the computed length
     assert_results_close(
-        length, 13.187633539381515 if name == "default" else 13.191216930059845
+        length, 13.187633269894581 if name == "default" else 13.187951183407069
     )
 
     # Check that both meshes are equal

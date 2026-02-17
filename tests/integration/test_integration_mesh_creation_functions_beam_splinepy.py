@@ -33,9 +33,9 @@ from beamme.mesh_creation_functions.beam_splinepy import (
 @pytest.mark.parametrize(
     ("splinepy_type", "ref_length"),
     [
-        ("curve_bezier", 5.064502347301837),
-        ("curve_nurbs", 3.140204403683438),
-        ("curve_nurbs_distorted", 12.056886977957966),
+        ("curve_bezier", 5.064502357868928),
+        ("curve_nurbs", 3.140204410040355),
+        ("curve_nurbs_distorted", 12.056885734650654),
     ],
 )
 def test_integration_mesh_creation_functions_beam_splinepy(
@@ -53,7 +53,13 @@ def test_integration_mesh_creation_functions_beam_splinepy(
     mat = get_default_test_beam_material(material_type="reissner")
     mesh = Mesh()
     _, length = create_beam_mesh_from_splinepy(
-        mesh, Beam3rHerm2Line3, mat, curve, n_el=3, output_length=True
+        mesh,
+        Beam3rHerm2Line3,
+        mat,
+        curve,
+        n_el=3,
+        output_length=True,
+        arc_length_integrator_kwargs={"scipy_integrate": False},
     )
     assert_results_close(ref_length, length)
 

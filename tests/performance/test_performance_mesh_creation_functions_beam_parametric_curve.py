@@ -52,7 +52,10 @@ def test_performance_mesh_creation_functions_beam_parametric_curve(
             get_parametric_function("distorted_helix"),
             [0, 2 * np.pi],
         ),
-        kwargs={"n_el": 500},
+        kwargs={
+            "n_el": 500,
+            "arc_length_integrator_kwargs": {"scipy_integrate": False},
+        },
         expected_time=0.35,
     )
 
@@ -88,6 +91,6 @@ def test_performance_mesh_creation_functions_beam_parametric_curve_splinepy(
         "BeamMe: mesh_creation_functions: Beam from splinepy",
         function_call_multiple,
         args=(mesh, Beam3, material, nurbs),
-        kwargs={"n_el": 50},
+        kwargs={"n_el": 50, "arc_length_integrator_kwargs": {"scipy_integrate": False}},
         expected_time=0.3,
     )
