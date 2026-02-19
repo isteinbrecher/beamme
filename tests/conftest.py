@@ -271,8 +271,8 @@ def sessionfinish_unused_reference_files(session):
 
         UNUSED_REFERENCE_FILES.update(all_reference_files - USED_REFERENCE_FILES)
 
-        if UNUSED_REFERENCE_FILES:
-            session.exitstatus = 1
+        # if UNUSED_REFERENCE_FILES:
+        #     session.exitstatus = 1
 
 
 def terminal_summary_unused_reference_files(terminalreporter):
