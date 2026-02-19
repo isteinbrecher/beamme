@@ -173,7 +173,7 @@ def _extract_mesh_sections(input_file: _InputFile) -> _Tuple[_InputFile, _Mesh]:
         ]
         element = element_class(nodes=nodes, data=input_element["data"])
         if "MAT" in element.data:
-            element.data["MAT"] = material_id_map[element.data["MAT"]]
+            element.material = material_id_map[element.data.pop("MAT")]
         mesh.elements.append(element)
 
     # extract geometry sets
