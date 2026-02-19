@@ -63,6 +63,13 @@ def dump_node(node):
 def dump_solid_element(solid_element):
     """Return a dict with the items representing the given solid element."""
 
+    if "MAT" in solid_element.data:
+        raise ValueError(
+            f"Element {solid_element.i_global} has a MAT entry in its data, this "
+            "is not supported, the materials have to be assigned via the material "
+            "attribute of the element."
+        )
+
     return {
         "id": solid_element.i_global + 1,
         "cell": {
@@ -71,7 +78,12 @@ def dump_solid_element(solid_element):
             ],
             "connectivity": solid_element.nodes,
         },
-        "data": solid_element.data,
+        "data": solid_element.data
+        | (
+            {"MAT": solid_element.material}
+            if solid_element.material is not None
+            else {}
+        ),
     }
 
 
