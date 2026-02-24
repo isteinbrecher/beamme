@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 import pyvista as pv
 import splinepy
-from vistools.pyvista.camera import apply_camera_settings
+from vistools.pyvista.camera import set_camera_settings
 from vistools.pyvista.polyline_cross_section import polyline_cross_section
 from vistools.vtk.merge_polylines import merge_polylines
 
@@ -1282,7 +1282,7 @@ def create_beamme_logo_full(plotter, plot_data):
             "view_angle": 30.0,
         }
     }
-    apply_camera_settings(plotter, view["2D"])
+    set_camera_settings(plotter, view["2D"])
 
 
 def create_beamme_logo_small(plotter, plot_data, square=True):
@@ -1312,7 +1312,7 @@ def create_beamme_logo_small(plotter, plot_data, square=True):
             "view_angle": 30.0,
         },
     }
-    apply_camera_settings(plotter, view[square])
+    set_camera_settings(plotter, view[square])
 
 
 def create_beamme_logo(base_dir, create_cubit=True):
