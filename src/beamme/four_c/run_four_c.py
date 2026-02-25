@@ -24,7 +24,6 @@
 import os as _os
 import shutil as _shutil
 import subprocess as _subprocess  # nosec B404
-import sys as _sys
 from pathlib import Path as _Path
 
 from beamme.utils.environment import get_env_variable as _get_env_variable
@@ -40,7 +39,6 @@ def run_four_c(
     output_name="xxx",
     restart_step=None,
     restart_from=None,
-    log_to_console=False,
 ):
     """Run a 4C simulation and return the exit code of the run.
 
@@ -70,8 +68,6 @@ def run_four_c(
         Time step to restart from
     restart_from: str
         Path to initial simulation (relative to output_dir)
-    log_to_console: bool
-        If the 4C simulation output should be shown in the console.
 
     Return
     ----
@@ -89,8 +85,8 @@ def run_four_c(
 
     # Setup paths and actual command to run
     _os.makedirs(output_dir, exist_ok=True)
-    log_file = _os.path.join(output_dir, output_name + ".log")
-    error_file = _os.path.join(output_dir, output_name + ".err")
+    log_file_path = _os.path.join(output_dir, output_name + ".log")
+    error_file_path = _os.path.join(output_dir, output_name + ".err")
     command = mpi_command.split(" ") + [
         "-np",
         str(n_proc),
@@ -108,27 +104,16 @@ def run_four_c(
         )
 
     # Actually run the command
-    with open(log_file, "w") as stdout_file, open(error_file, "w") as stderr_file:
+    with (
+        open(log_file_path, "w") as log_file,
+        open(error_file_path, "w") as error_file,
+    ):
         process = _subprocess.Popen(
             command,  # nosec B603
-            stdout=_subprocess.PIPE,
-            stderr=_subprocess.PIPE,
             cwd=output_dir,
-            text=True,
+            stdout=log_file,
+            stderr=error_file,
         )
-
-        for stdout_line in process.stdout:
-            if log_to_console:
-                _sys.stdout.write(stdout_line)
-            stdout_file.write(stdout_line)
-
-        for stderr_line in process.stderr:
-            if log_to_console:
-                _sys.stderr.write(stderr_line)
-            stderr_file.write(stderr_line)
-
-        process.stdout.close()
-        process.stderr.close()
         return_code = process.wait()
     return return_code
 
