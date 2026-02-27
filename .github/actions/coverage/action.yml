@@ -4,7 +4,7 @@ runs:
   using: composite
   steps:
     - name: Upload coverage report
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: coverage-report
         path: htmlcov/
@@ -16,7 +16,7 @@ runs:
         genbadge coverage -i coverage.xml -o coverage-badge/coverage_badge.svg
         cp .github/actions/coverage/coverage_badge_index.html coverage-badge/index.html
     - name: Upload coverage badge
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: coverage-badge
         path: coverage-badge/
