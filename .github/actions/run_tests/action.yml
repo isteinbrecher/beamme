@@ -27,7 +27,7 @@ runs:
 
     - name: Upload test results on failure
       if: failure()
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ github.job }}-${{ runner.os }}-python${{ env.PYTHON_VERSION }}-${{ github.run_number }}
         path: ${{ env.PYTEST_TMPDIR }}
