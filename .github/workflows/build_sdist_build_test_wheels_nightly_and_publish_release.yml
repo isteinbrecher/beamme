@@ -51,7 +51,7 @@ jobs:
     steps:
 
       - name: Download all wheels and the source distribution
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           path: upload
 
