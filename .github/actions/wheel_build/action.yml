@@ -28,7 +28,7 @@ runs:
         CIBW_ARCHS_MACOS: "arm64"
 
     - name: Upload wheels
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.wheel-name }}
         path: wheelhouse/*.whl
