@@ -19,7 +19,7 @@ runs:
       run: python -m build . --sdist --outdir sdist
 
     - name: Upload sdist artifact
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: sdist
         path: sdist/*.tar.gz
