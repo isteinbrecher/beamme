@@ -482,10 +482,7 @@ def set_binning_strategy_section(
 
 
 def set_beam_interaction_section(
-    input_file: _InputFile,
-    *,
-    repartition_strategy: str = "everydt",
-    search_strategy: str = "bounding_volume_hierarchy",
+    input_file: _InputFile, *, repartition_strategy: str = "everydt"
 ):
     """Set beam interaction section in input file.
 
@@ -498,17 +495,9 @@ def set_beam_interaction_section(
         Options: "adaptive" or "everydt"
     search_strategy:
         Type of search strategy used for finding coupling pairs.
-        Options: "bruteforce_with_binning", "bounding_volume_hierarchy"
     """
 
-    input_file.add(
-        {
-            "BEAM INTERACTION": {
-                "REPARTITIONSTRATEGY": repartition_strategy,
-                "SEARCH_STRATEGY": search_strategy,
-            }
-        }
-    )
+    input_file.add({"BEAM INTERACTION": {"REPARTITIONSTRATEGY": repartition_strategy}})
 
 
 def set_beam_contact_runtime_output(
