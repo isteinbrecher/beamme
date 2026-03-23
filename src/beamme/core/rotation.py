@@ -213,7 +213,7 @@ class Rotation:
     def get_numpy_quaternion(self):
         """Return a numpy quaternion object representing this rotation
         (copy)."""
-        return _quaternion.from_float_array(_np.array(self.q))
+        return _quaternion.from_float_array(self.q)
 
     def get_rotation_vector(self):
         """Return the rotation vector for this object."""
