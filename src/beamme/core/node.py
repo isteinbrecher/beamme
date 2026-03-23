@@ -34,7 +34,7 @@ class Node(_BaseMeshItem):
         super().__init__(**kwargs)
 
         # Coordinates of this node.
-        self.coordinates = _np.array(coordinates)
+        self.coordinates = _np.array(coordinates, dtype=float)
 
         # If this node is at the end of a line or curve (by default only those
         # nodes are checked for overlapping nodes).
