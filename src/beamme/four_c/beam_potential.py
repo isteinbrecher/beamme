@@ -104,6 +104,7 @@ class BeamPotential:
         potential_reduction_length: float | int | None = None,
         automatic_differentiation: bool,
         choice_master_slave: str | None,
+        two_half_pass: bool,
         runtime_output_interval_steps: int | None = None,
         runtime_output_every_iteration: bool,
         runtime_output_force: bool,
@@ -137,6 +138,8 @@ class BeamPotential:
                 force.
             automatic_differentiation:
                 Use automatic differentiation via FAD.
+            two_half_pass:
+                Whether to use the two half pass approach.
             choice_master_slave:
                 Rule how to assign the role of master and slave to beam elements (if
                 applicable).
@@ -171,6 +174,7 @@ class BeamPotential:
                 "n_integration_segments": integration_segments,
                 "n_gauss_points": gauss_points,
                 "potential_reduction_length": potential_reduction_length,
+                "two_half_pass": two_half_pass,
             }
         }
 

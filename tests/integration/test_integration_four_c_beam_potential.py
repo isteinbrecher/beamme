@@ -71,6 +71,7 @@ def test_integration_four_c_beam_potential_helix(
             potential_reduction_length=15.0,
             automatic_differentiation=False,
             choice_master_slave="smaller_eleGID_is_slave",
+            two_half_pass=True,
             runtime_output_interval_steps=1,
             runtime_output_force=True,
             runtime_output_moment=True,
