@@ -31,11 +31,11 @@ import numpy as np
 import pytest
 import vtk
 import xmltodict
-from fourcipp.utils.dict_utils import compare_nested_dicts_or_lists
 from vistools.vtk.compare_grids import compare_grids
 
 from beamme.core.mesh import Mesh
 from beamme.four_c.input_file import InputFile
+from beamme.utils.data_structures import compare_nested_dicts_or_lists
 
 # GLOBAL DEFAULT TEST TOLERANCES
 RELATIVE_TOLERANCE = 1e-13
@@ -101,6 +101,7 @@ def assert_results_close(tmp_path, current_test_name) -> Callable:
                 custom_compare=lambda obj, ref_obj: custom_fourcipp_comparison(
                     obj, ref_obj, rtol=rtol, atol=atol
                 ),
+                raise_on_mismatch=True,
             )
         except AssertionError as error:
             handle_failed_assertion(tmp_path, current_test_name, reference, result)
