@@ -19,16 +19,15 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-"""This module implements the class that will be used as the base for all items
-that are in a mesh."""
-
-from typing import Optional as _Optional
+"""This module implements the base class for boundary conditions, functions,
+geometry sets and materials."""
 
 
 class BaseMeshItem:
-    """Base class for all objects that are related to a mesh."""
+    """Base class for boundary conditions, functions, geometry sets and
+    materials."""
 
-    def __init__(self, data: _Optional[dict] = None):
+    def __init__(self, data: dict | None = None):
         """Create the base object.
 
         Args:
