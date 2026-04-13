@@ -281,8 +281,7 @@ def mesh_to_data_arrays(mesh: _Mesh):
             f"Expected either SpaceTimeElementQuad4 or SpaceTimeElementQuad9, got {element_types[0]}"
         )
 
-    _, raw_unique_nodes = _get_coupled_nodes_to_master_map(mesh, assign_i_global=True)
-    unique_nodes = _cast(_List[NodeCosseratSpaceTime], raw_unique_nodes)
+    _, unique_nodes = _get_coupled_nodes_to_master_map(mesh, assign_i_global=True)
 
     n_nodes = len(unique_nodes)
     n_elements = len(mesh.elements)
@@ -293,7 +292,8 @@ def mesh_to_data_arrays(mesh: _Mesh):
     connectivity = _np.zeros((n_elements, n_nodes_per_element), dtype=int)
     element_rotation_vectors = _np.zeros((n_elements, n_nodes_per_element, 3))
 
-    for i_node, node in enumerate(unique_nodes):
+    unique_nodes_casted_space_time = _cast(_List[NodeCosseratSpaceTime], unique_nodes)
+    for i_node, node in enumerate(unique_nodes_casted_space_time):
         time[i_node] = node.time
 
     for i_element, element in enumerate(mesh.elements):

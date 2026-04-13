@@ -168,17 +168,13 @@ def filter_nodes(nodes, *, middle_nodes=True):
         return nodes
 
 
-def get_nodal_coordinates(nodes):
+def get_nodal_coordinates(nodes: list[_Node]) -> _NDArray:
     """Return an array with the coordinates of the given nodes.
 
-    Args
-    ----
-    kwargs:
-        Will be passed to self.get_global_nodes.
+    Args:
+        nodes: Nodes for which the coordinates should be returned.
 
-    Return
-    ----
-    pos: _np.array
+    Returns:
         Numpy array with all the positions of the nodes.
     """
     coordinates = _np.zeros([len(nodes), 3])
