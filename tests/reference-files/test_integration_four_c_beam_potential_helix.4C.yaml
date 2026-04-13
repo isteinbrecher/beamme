@@ -9,6 +9,7 @@ beam_potential:
   n_gauss_points: 50
   n_integration_segments: 2
   potential_reduction_length: 15.0
+  two_half_pass: true
   regularization:
     type: "linear"
     separation: 0.1
