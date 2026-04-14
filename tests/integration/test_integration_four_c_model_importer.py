@@ -34,7 +34,7 @@ from beamme.four_c.model_importer import (
     import_four_c_model,
 )
 from beamme.mesh_creation_functions.beam_line import create_beam_mesh_line
-from tests.create_test_models import create_tube_cubit
+from tests.create_test_models import create_multiple_solid_bricks, create_tube_cubit
 
 
 @pytest.mark.parametrize("full_import", (False, True))
@@ -57,6 +57,44 @@ def test_integration_four_c_model_importer_import_cubitpy_model(
         ),
         input_file_cubit,
     )
+
+
+@pytest.mark.parametrize("full_import", (False, True))
+@pytest.mark.cubitpy
+def test_integration_four_c_model_importer_solid_element_types_from_cubitpy(
+    full_import, assert_results_close, get_corresponding_reference_file_path
+):
+    """Check that all supported solid element types are imported correctly from
+    a CubitPy instance."""
+
+    cubit = create_multiple_solid_bricks()
+    input_file, mesh = import_cubitpy_model(cubit, convert_input_to_mesh=full_import)
+    if full_import:
+        input_file.add(mesh)
+
+    reference_file = get_corresponding_reference_file_path(
+        reference_file_base_name="test_other_create_cubit_input_files_multiple_solid_bricks"
+    )
+    assert_results_close(reference_file, input_file)
+
+
+@pytest.mark.parametrize("full_import", (False, True))
+def test_integration_four_c_model_importer_solid_element_types_from_input_file(
+    full_import, assert_results_close, get_corresponding_reference_file_path
+):
+    """Check that all supported solid element types are imported correctly from
+    a text based input file."""
+
+    reference_file = get_corresponding_reference_file_path(
+        reference_file_base_name="test_other_create_cubit_input_files_multiple_solid_bricks"
+    )
+    input_file, mesh = import_four_c_model(
+        input_file_path=reference_file, convert_input_to_mesh=full_import
+    )
+    if full_import:
+        input_file.add(mesh)
+
+    assert_results_close(reference_file, input_file)
 
 
 def test_integration_four_c_model_importer_import_nested_materials(
