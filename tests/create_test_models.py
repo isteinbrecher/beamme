@@ -34,6 +34,7 @@ from beamme.utils.environment import cubitpy_is_available
 
 if cubitpy_is_available():
     from cubitpy import CubitPy, cupy
+    from cubitpy.cubit_utility import formatter as fmt
     from cubitpy.mesh_creation_functions import (
         create_brick,
         extrude_mesh_normal_to_surface,
@@ -379,3 +380,112 @@ def create_solid_brick(input_file_path, get_default_test_solid_material):
     material.i_global = 0
     cubit.fourc_input["MATERIALS"] = [material.dump_to_list()]
     cubit.dump(input_file_path)
+
+
+def create_multiple_solid_bricks():
+    """Create blocks with all supported element types.
+
+    Also add some node sets to ensure their correct representation in
+    BeamMe.
+    """
+
+    if not cupy.is_coreform():
+        raise ValueError("This script requires Cubit Coreform")
+
+    cubit = CubitPy()
+
+    brick_element_types = [
+        cupy.element_type.hex8,
+        cupy.element_type.hex20,
+        cupy.element_type.hex27,
+    ]
+    for i_brick, element_type in enumerate(brick_element_types):
+        brick = create_brick(
+            cubit,
+            1,
+            1,
+            1,
+            element_type=element_type,
+            mesh_interval=[2, 2, 2],
+            mesh=False,
+            name=f"hex_{i_brick}",
+        )
+        cubit.cmd(f"move {fmt(brick)} x {i_brick * 2} y 0 z 0 include_merged")
+        brick.mesh()
+        cubit.add_node_set(brick.surfaces()[0], name=f"surface_brick_{i_brick}_top")
+        cubit.add_node_set(brick.surfaces()[1], name=f"surface_brick_{i_brick}_bottom")
+
+    def get_wedge_indices(cubit) -> set[int]:
+        """Return the wedge element indices in cubit."""
+        wedge_group = cubit.group(add_value="add wedge all")
+        return set(cubit.get_group_wedges(wedge_group.id()))
+
+    wedge_element_types = [cupy.element_type.wedge6]
+    for i_wedge, element_type in enumerate(wedge_element_types):
+        return_dict = cubit.cmd_return_dict(
+            "create surface rectangle width 1 height 1 zplane",
+            [cupy.geometry.vertex, cupy.geometry.surface],
+        )
+        surface = return_dict[cupy.geometry.surface][0]
+        owning_volume = cubit.volume(cubit.get_owning_volume("surface", surface.id()))
+        cubit.cmd(
+            f"move {fmt(surface)} x {(len(brick_element_types) + i_wedge) * 2} y 0 z -0.5 include_merged"
+        )
+        vertices = return_dict[cupy.geometry.vertex]
+        curve_1 = cubit.create_curve(vertices[0], vertices[2])
+        curve_2 = cubit.create_curve(vertices[1], vertices[3])
+        cubit.cmd(f"partition create {fmt(surface)} {fmt([curve_1, curve_2])}")
+        surfaces = owning_volume.surfaces()
+        cubit.cmd(f"{fmt(surfaces)} scheme trimesh")
+        cubit.cmd(f"{fmt(surfaces)} size 2")
+        tri_indices = set()
+        for surface in surfaces:
+            surface.mesh()
+            tri_indices.update(cubit.get_surface_tris(surface.id()))
+        tri_indices_str = " ".join(str(i) for i in tri_indices)
+        wedge_indices_prior = get_wedge_indices(cubit)
+        cubit.cmd(f"create element offset tri {tri_indices_str} distance 1.0 layers 2")
+        wedge_indices_after = get_wedge_indices(cubit)
+
+        wedges_added_str = " ".join(
+            str(i) for i in wedge_indices_after - wedge_indices_prior
+        )
+        wedge_group = cubit.group(add_value=f"add wedge {wedges_added_str}")
+        cubit.add_element_type(wedge_group, element_type, name=f"wedge_{i_wedge}")
+        volume = cubit.cmd_return(
+            f"create mesh geometry wedge {wedges_added_str} feature_angle 135.0",
+            cupy.geometry.volume,
+        )
+        for name, condition in [
+            ("top", "z_coord > 0.1"),
+            ("bottom", "z_coord < -0.1"),
+        ]:
+            cubit.add_node_set(
+                cubit.group(add_value=f"add surface in {fmt(volume)} with {condition}"),
+                name=f"surface_wedge_{i_wedge}_{name}",
+            )
+
+    tet_element_types = [
+        cupy.element_type.tet4,
+        cupy.element_type.tet10,
+    ]
+    for i_tet, element_type in enumerate(tet_element_types):
+        pyramid = cubit.pyramid(1.0, 3, 1.0, 1.0)
+        cubit.cmd(
+            f"move {fmt(pyramid)} x {(len(brick_element_types) + len(wedge_element_types) + i_tet) * 2} y 0 z 0 include_merged"
+        )
+        cubit.cmd(f"{fmt(pyramid)} size 2")
+        cubit.cmd(f"{fmt(pyramid)} scheme tetmesh")
+        pyramid.mesh()
+
+        cubit.add_element_type(pyramid.volumes()[0], element_type, name=f"tet_{i_tet}")
+        cubit.add_node_set(
+            pyramid.surfaces()[0], name=f"surface_pyramid_{i_tet}_bottom"
+        )
+
+    # Set the material.
+    cubit.fourc_input["MATERIALS"] = [
+        {"MAT": 1, "MAT_Struct_StVenantKirchhoff": {"DENS": 1, "NUE": 0.3, "YOUNG": 2}}
+    ]
+
+    return cubit
