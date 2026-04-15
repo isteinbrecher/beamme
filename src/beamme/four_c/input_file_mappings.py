@@ -37,7 +37,7 @@ INPUT_FILE_MAPPINGS["beam_type_to_four_c_type"] = {
     _BeamType.euler_bernoulli: "BEAM3EB",
 }
 INPUT_FILE_MAPPINGS["solid_type_to_four_c_type"] = {
-    "nurbs_2d": "WALLNURBS",
+    "nurbs_2d": "SOLID",
     "nurbs_3d": "SOLID",
     "nurbs_shell": "SHELL_KIRCHHOFF_LOVE_NURBS",
     "solid": "SOLID",

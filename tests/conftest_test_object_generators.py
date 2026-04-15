@@ -193,10 +193,8 @@ def get_default_test_solid_element() -> Callable:
                 n_nodes=9,
                 element_technology={
                     "KINEM": "nonlinear",
-                    "EAS": "none",
-                    "THICK": 1.0,
-                    "STRESS_STRAIN": "plane_strain",
-                    "GP": [3, 3],
+                    "THICKNESS": 1.0,
+                    "PLANE_ASSUMPTION": "plane_strain",
                 },
             )
 
