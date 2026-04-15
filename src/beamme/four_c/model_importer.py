@@ -174,6 +174,11 @@ def _extract_mesh_sections(input_file: _InputFile) -> _Tuple[_InputFile, _Mesh]:
         four_c_type = input_element["data"].pop("type")
         material_id = input_element["data"].pop("MAT", None)
 
+        four_c_cell_type = input_element["cell"].get("type")
+        beamme_element_type = _INPUT_FILE_MAPPINGS[
+            "four_c_type_and_cell_to_beamme_element_type"
+        ][four_c_type, four_c_cell_type]
+
         # Loop over already found block element types and check if the current
         # element matches one of those. If not, create a new block element type
         # for this element.
@@ -182,7 +187,8 @@ def _extract_mesh_sections(input_file: _InputFile) -> _Tuple[_InputFile, _Mesh]:
                 break
         else:
             element_type = _get_four_c_solid(
-                _INPUT_FILE_MAPPINGS["four_c_type_to_solid_type"][four_c_type],
+                beamme_element_type,
+                four_c_type,
                 n_nodes=len(connectivity),
                 element_technology=input_element["data"],
             )

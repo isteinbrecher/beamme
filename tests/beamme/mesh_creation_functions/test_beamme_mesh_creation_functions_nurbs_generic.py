@@ -24,7 +24,6 @@
 import pytest
 
 from beamme.core.mesh import Mesh
-from beamme.four_c.element_solid import get_four_c_solid
 from beamme.mesh_creation_functions.nurbs_generic import (
     add_geomdl_nurbs_to_mesh,
     create_geometry_sets,
@@ -36,12 +35,11 @@ from beamme.mesh_creation_functions.nurbs_geometries import (
 
 
 @pytest.mark.parametrize(
-    ("nurbs_patch", "solid_type_string", "n_nodes", "reference_values"),
+    ("nurbs_patch", "solid_type_string", "reference_values"),
     [
         (
             create_nurbs_flat_plate_2d(1, 2, n_ele_u=1, n_ele_v=2),
             "nurbs_2d",
-            9,
             {
                 "vertex_u_min_v_min": [0],
                 "vertex_u_min_v_max": [9],
@@ -61,7 +59,6 @@ from beamme.mesh_creation_functions.nurbs_geometries import (
         (
             create_nurbs_brick(1, 2, 3, n_ele_u=1, n_ele_v=2, n_ele_w=3),
             "nurbs_3d",
-            27,
             {
                 "vertex_u_min_v_min_w_min": [0],
                 "vertex_u_min_v_min_w_max": [48],
@@ -214,16 +211,14 @@ from beamme.mesh_creation_functions.nurbs_geometries import (
     ],
 )
 def test_beamme_mesh_creation_functions_nurbs_generic_sets(
-    nurbs_patch, solid_type_string, n_nodes, reference_values
+    nurbs_patch, solid_type_string, get_default_test_solid_element, reference_values
 ):
     """Test that the add NURBS to mesh functionality returns the correct
     geometry sets."""
 
     # Add the nurbs to a mesh
     mesh = Mesh()
-    element_type = get_four_c_solid(
-        solid_type_string=solid_type_string, n_nodes=n_nodes
-    )
+    element_type = get_default_test_solid_element(solid_type_string)
     add_geomdl_nurbs_to_mesh(mesh, element_type, nurbs_patch)
     nurbs_patch = mesh.elements[0]
 

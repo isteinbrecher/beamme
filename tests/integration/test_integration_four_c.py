@@ -36,7 +36,6 @@ from beamme.four_c.element_beam import (
     Beam3rHerm2Line3,
     get_four_c_reissner_beam,
 )
-from beamme.four_c.element_solid import get_four_c_solid
 from beamme.four_c.header_functions import (
     add_result_description,
     set_beam_to_solid_meshtying,
@@ -191,6 +190,7 @@ def test_integration_four_c_surface_to_surface_contact_import(
 def test_integration_four_c_nurbs_import(
     get_default_test_beam_material,
     get_default_test_solid_material,
+    get_default_test_solid_element,
     assert_results_close,
     get_corresponding_reference_file_path,
     tmp_path,
@@ -219,16 +219,11 @@ def test_integration_four_c_nurbs_import(
     # Add NURBS to mesh (3 times to get the full cylinder)
     mesh = Mesh()
     mat = get_default_test_solid_material(material_type="st_venant_kirchhoff")
-    element_description = {"KINEM": "nonlinear"}
 
     volume_set = GeometrySetNodes(geometry_type=bme.geo.volume)
     fix_set = GeometrySetNodes(geometry_type=bme.geo.surface)
     for i in range(3):
-        element_type = get_four_c_solid(
-            solid_type_string="nurbs_3d",
-            n_nodes=27,
-            element_technology=element_description,
-        )
+        element_type = get_default_test_solid_element("nurbs_3d")
         patch_set = add_splinepy_nurbs_to_mesh(
             mesh, element_type, extruded, material=mat
         )

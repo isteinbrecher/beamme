@@ -26,7 +26,6 @@ import splinepy
 
 from beamme.core.mesh import Mesh
 from beamme.core.rotation import Rotation
-from beamme.four_c.element_solid import get_four_c_solid
 from beamme.mesh_creation_functions.nurbs_generic import (
     add_geomdl_nurbs_to_mesh,
     add_splinepy_nurbs_to_mesh,
@@ -497,6 +496,7 @@ def test_integration_mesh_creation_functions_nurbs_torus_surface(
 
 def test_integration_mesh_creation_functions_nurbs_empty_knot_spans(
     get_default_test_solid_material,
+    get_default_test_solid_element,
     assert_results_close,
     get_corresponding_reference_file_path,
 ):
@@ -513,7 +513,7 @@ def test_integration_mesh_creation_functions_nurbs_empty_knot_spans(
     # Create mesh
     mesh = Mesh()
     mat = get_default_test_solid_material(material_type="st_venant_kirchhoff")
-    element_type = get_four_c_solid("nurbs_3d", n_nodes=27)
+    element_type = get_default_test_solid_element("nurbs_3d")
     patch_set = add_splinepy_nurbs_to_mesh(mesh, element_type, pipe, material=mat)
     mesh.add(patch_set)
     mesh.couple_nodes(reuse_matching_nodes=True)
