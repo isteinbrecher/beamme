@@ -46,4 +46,9 @@ def test_other_create_input_files_beam_to_solid(
     input_file.add(mesh)
 
     # Check results
-    assert_results_close(get_corresponding_reference_file_path(), input_file)
+    assert_results_close(
+        get_corresponding_reference_file_path(
+            additional_identifier="full_import" if full_import else None
+        ),
+        input_file,
+    )

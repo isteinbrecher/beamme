@@ -10,23 +10,23 @@ MATERIALS:
       MOMIN2: 0.7853981633974483
       MOMIN3: 0.7853981633974483
 DESIGN LINE DIRICH CONDITIONS:
-  - E: 1
+  - E: 3
     NUMDOF: 3
     ONOFF: [1, 1, 1]
     VAL: [1, 0, 0]
     FUNCT: [0, 0, 0]
-  - E: 2
+  - E: 4
     NUMDOF: 3
     ONOFF: [1, 1, 1]
     VAL: [1, 0, 0]
     FUNCT: [0, 0, 0]
 DESIGN LINE NEUMANN CONDITIONS:
-  - E: 3
+  - E: 5
     NUMDOF: 3
     ONOFF: [1, 1, 1]
     VAL: [2, 0, 0]
     FUNCT: [0, 0, 0]
-  - E: 4
+  - E: 6
     NUMDOF: 3
     ONOFF: [1, 1, 1]
     VAL: [2, 0, 0]
@@ -65,15 +65,15 @@ DNODE-NODE TOPOLOGY:
   - "NODE 9 DNODE 2"
   - "NODE 10 DNODE 2"
 DLINE-NODE TOPOLOGY:
-  - "NODE 1 DLINE 1"
-  - "NODE 2 DLINE 1"
-  - "NODE 3 DLINE 1"
-  - "NODE 7 DLINE 2"
-  - "NODE 8 DLINE 2"
-  - "NODE 9 DLINE 2"
-  - "NODE 4 DLINE 3"
-  - "NODE 5 DLINE 3"
-  - "NODE 6 DLINE 3"
-  - "NODE 10 DLINE 4"
-  - "NODE 11 DLINE 4"
-  - "NODE 12 DLINE 4"
+  - "NODE 1 DLINE 3"
+  - "NODE 2 DLINE 3"
+  - "NODE 3 DLINE 3"
+  - "NODE 7 DLINE 4"
+  - "NODE 8 DLINE 4"
+  - "NODE 9 DLINE 4"
+  - "NODE 4 DLINE 5"
+  - "NODE 5 DLINE 5"
+  - "NODE 6 DLINE 5"
+  - "NODE 10 DLINE 6"
+  - "NODE 11 DLINE 6"
+  - "NODE 12 DLINE 6"

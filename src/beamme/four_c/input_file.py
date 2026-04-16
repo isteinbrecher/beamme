@@ -264,15 +264,16 @@ class InputFile:
             mesh.check_overlapping_elements()
 
         # Compute geometry-set starting indices
-        start_indices_geometry_set = {
-            geometry_type: max(
-                (entry["d_id"] for entry in self.sections.get(section_name, [])),
-                default=0,
-            )
-            for geometry_type, section_name in _INPUT_FILE_MAPPINGS[
-                "geometry_sets_geometry_to_condition_name"
-            ].items()
-        }
+        start_index_geometry_set = max(
+            (
+                entry["d_id"]
+                for section_name in _INPUT_FILE_MAPPINGS[
+                    "geometry_sets_geometry_to_condition_name"
+                ].values()
+                for entry in self.sections.get(section_name, [])
+            ),
+            default=0,
+        )
 
         # Determine global start indices
         start_index_nodes = len(self.sections.get("NODE COORDS", []))
@@ -299,7 +300,7 @@ class InputFile:
         # Add sets from couplings and boundary conditions to a temp container
         mesh.unlink_nodes()
         mesh_sets = mesh.get_unique_geometry_sets(
-            geometry_set_start_indices=start_indices_geometry_set
+            geometry_set_start_index=start_index_geometry_set
         )
 
         # Assign global indices
