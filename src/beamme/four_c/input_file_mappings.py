@@ -36,17 +36,6 @@ INPUT_FILE_MAPPINGS["beam_type_to_four_c_type"] = {
     _BeamType.kirchhoff: "BEAM3K",
     _BeamType.euler_bernoulli: "BEAM3EB",
 }
-INPUT_FILE_MAPPINGS["solid_type_to_four_c_type"] = {
-    "nurbs_2d": "WALLNURBS",
-    "nurbs_3d": "SOLID",
-    "nurbs_shell": "SHELL_KIRCHHOFF_LOVE_NURBS",
-    "solid": "SOLID",
-    "rigid_sphere": "RIGIDSPHERE",
-}
-INPUT_FILE_MAPPINGS["four_c_type_to_solid_type"] = {
-    "SOLID": "solid",
-    "RIGIDSPHERE": "rigid_sphere",
-}
 INPUT_FILE_MAPPINGS["element_type_and_n_nodes_to_four_c_cell"] = {
     (_bme.element_type.beam, 2): "LINE2",
     (_bme.element_type.beam, 3): "LINE3",
@@ -61,6 +50,15 @@ INPUT_FILE_MAPPINGS["element_type_and_n_nodes_to_four_c_cell"] = {
     (_bme.element_type.solid, 10): "TET10",
     (_bme.element_type.solid, 6): "WEDGE6",
     (_bme.element_type.solid, 1): "POINT1",
+}
+INPUT_FILE_MAPPINGS["four_c_type_and_cell_to_beamme_element_type"] = {
+    ("SOLID", "HEX8"): _bme.element_type.solid,
+    ("SOLID", "HEX20"): _bme.element_type.solid,
+    ("SOLID", "HEX27"): _bme.element_type.solid,
+    ("SOLID", "TET4"): _bme.element_type.solid,
+    ("SOLID", "TET10"): _bme.element_type.solid,
+    ("SOLID", "WEDGE6"): _bme.element_type.solid,
+    ("RIGIDSPHERE", "POINT1"): _bme.element_type.solid,
 }
 INPUT_FILE_MAPPINGS["geometry_sets_geometry_to_entry_name"] = {
     _bme.geo.point: "DNODE",

@@ -28,6 +28,7 @@ import numpy as np
 import pytest
 import splinepy
 
+from beamme.core.conf import bme
 from beamme.core.element import Element
 from beamme.core.material import MaterialBeamBase
 from beamme.cosserat_curve.cosserat_curve import CosseratCurve
@@ -189,25 +190,28 @@ def get_default_test_solid_element() -> Callable:
 
         if element_type == "nurbs_2d":
             return get_four_c_solid(
-                element_type,
+                bme.element_type.nurbs,
+                "SOLID",
                 n_nodes=9,
                 element_technology={
                     "KINEM": "nonlinear",
-                    "EAS": "none",
-                    "THICK": 1.0,
-                    "STRESS_STRAIN": "plane_strain",
-                    "GP": [3, 3],
+                    "THICKNESS": 1.0,
+                    "PLANE_ASSUMPTION": "plane_strain",
                 },
             )
 
         elif element_type == "nurbs_3d":
             return get_four_c_solid(
-                element_type, n_nodes=27, element_technology={"KINEM": "nonlinear"}
+                bme.element_type.nurbs,
+                "SOLID",
+                n_nodes=27,
+                element_technology={"KINEM": "nonlinear"},
             )
 
         elif element_type == "nurbs_shell":
             return get_four_c_solid(
-                element_type,
+                bme.element_type.nurbs,
+                "SHELL_KIRCHHOFF_LOVE_NURBS",
                 n_nodes=9,
                 element_technology={"GP": [3, 3]},
             )
