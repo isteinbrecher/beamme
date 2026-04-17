@@ -25,9 +25,7 @@ elements, sets, ...) for a meshed geometry."""
 import copy as _copy
 import os as _os
 import warnings as _warnings
-from typing import Dict as _Dict
 from typing import List as _List
-from typing import Optional as _Optional
 
 import numpy as _np
 import pyvista as _pv
@@ -272,7 +270,8 @@ class Mesh:
         *,
         coupling_sets: bool = True,
         link_to_nodes: str = "no_link",
-        geometry_set_start_indices: _Optional[_Dict] = None,
+        # TODO: remove this parameter once we use a common mesh representation
+        geometry_set_start_index: int = 0,
     ) -> _GeometrySetContainer:
         """Return a geometry set container that contains geometry sets
         explicitly added to the mesh, as well as sets for boundary conditions.
@@ -291,10 +290,8 @@ class Mesh:
                     A link will be set for all nodes that are part of the geometry set, i.e., also
                     nodes connected to elements of an element set. This is mainly used for vtk
                     output so we can color the nodes which are part of element sets.
-            geometry_set_start_indices:
-                Dictionary where the keys are geometry type and the value is the starting
-                index for those geometry sets. This can be used to define an offset in the
-                i_global numbering of the geometry sets. The offsets default to 0.
+            geometry_set_start_index:
+                Starting index for the geometry set IDs, defaults to 0.
         """
 
         is_link_nodes = not link_to_nodes == "no_link"
@@ -321,18 +318,14 @@ class Mesh:
                     if bc.geometry_set not in mesh_sets[geom_key]:
                         mesh_sets[geom_key].append(bc.geometry_set)
 
+        i_global = geometry_set_start_index
         for key in mesh_sets.keys():
-            i_global_offset = 0
-            if geometry_set_start_indices is not None:
-                if key in geometry_set_start_indices:
-                    i_global_offset = geometry_set_start_indices[key]
-                else:
-                    raise KeyError("Could not find {key} in geometry_set_start_indices")
-            for i, geometry_set in enumerate(mesh_sets[key]):
+            for geometry_set in mesh_sets[key]:
                 # Add global indices to the geometry set.
-                geometry_set.i_global = i + i_global_offset
+                geometry_set.i_global = i_global
                 if is_link_nodes:
                     geometry_set.link_to_nodes(link_to_nodes=link_to_nodes)
+                i_global += 1
 
         return mesh_sets
 
