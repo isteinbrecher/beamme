@@ -24,7 +24,12 @@ files."""
 
 from typing import Any as _Any
 
+import pyvista as _pv
+
 from beamme.core.conf import bme as _bme
+from beamme.core.mesh_representation import (
+    MESH_REPRESENTATION_MAPPINGS as _MESH_REPRESENTATION_MAPPINGS,
+)
 from beamme.four_c.four_c_types import BeamType as _BeamType
 from beamme.utils.data_structures import (
     create_inverse_mapping as _create_inverse_mapping,
@@ -51,26 +56,41 @@ INPUT_FILE_MAPPINGS["element_type_and_n_nodes_to_four_c_cell"] = {
     (_bme.element_type.solid, 6): "WEDGE6",
     (_bme.element_type.solid, 1): "POINT1",
 }
-INPUT_FILE_MAPPINGS["four_c_type_and_cell_to_beamme_element_type"] = {
-    ("SOLID", "HEX8"): _bme.element_type.solid,
-    ("SOLID", "HEX20"): _bme.element_type.solid,
-    ("SOLID", "HEX27"): _bme.element_type.solid,
-    ("SOLID", "TET4"): _bme.element_type.solid,
-    ("SOLID", "TET10"): _bme.element_type.solid,
-    ("SOLID", "WEDGE6"): _bme.element_type.solid,
-    ("RIGIDSPHERE", "POINT1"): _bme.element_type.solid,
+INPUT_FILE_MAPPINGS["four_c_cell_to_element_type_and_n_nodes"] = (
+    _create_inverse_mapping(
+        INPUT_FILE_MAPPINGS["element_type_and_n_nodes_to_four_c_cell"]
+    )
+)
+INPUT_FILE_MAPPINGS["four_c_cell_to_vtk_cell_type"] = {
+    "POINT1": _pv.CellType.VERTEX,
+    "HEX8": _pv.CellType.HEXAHEDRON,
+    "TET4": _pv.CellType.TETRA,
+    "TET10": _pv.CellType.QUADRATIC_TETRA,
+    "HEX20": _pv.CellType.QUADRATIC_HEXAHEDRON,
+    "HEX27": _pv.CellType.TRIQUADRATIC_HEXAHEDRON,
+    "WEDGE6": _pv.CellType.WEDGE,
+}
+# TODO: This can be removed once we have fully switched to mesh representation
+INPUT_FILE_MAPPINGS["beam_n_nodes_to_four_c_ordering"] = {
+    2: [0, 1],
+    3: [0, 2, 1],
+    4: [0, 3, 1, 2],
+    5: [0, 4, 1, 2, 3],
+}
+INPUT_FILE_MAPPINGS["four_c_cell_to_vtk_connectivity_mapping"] = {
+    # Only list the non-standard mappings
+    "HEX20": _MESH_REPRESENTATION_MAPPINGS[
+        "element_type_and_n_nodes_to_connectivity_mapping_vtk_to_beamme"
+    ][(_bme.element_type.solid, 20)],
+    "HEX27": _MESH_REPRESENTATION_MAPPINGS[
+        "element_type_and_n_nodes_to_connectivity_mapping_vtk_to_beamme"
+    ][(_bme.element_type.solid, 27)],
 }
 INPUT_FILE_MAPPINGS["geometry_sets_geometry_to_entry_name"] = {
     _bme.geo.point: "DNODE",
     _bme.geo.line: "DLINE",
     _bme.geo.surface: "DSURFACE",
     _bme.geo.volume: "DVOL",
-}
-INPUT_FILE_MAPPINGS["beam_n_nodes_to_four_c_ordering"] = {
-    2: [0, 1],
-    3: [0, 2, 1],
-    4: [0, 3, 1, 2],
-    5: [0, 4, 1, 2, 3],
 }
 INPUT_FILE_MAPPINGS["boundary_conditions"] = {
     (_bme.bc.dirichlet, _bme.geo.point): "DESIGN POINT DIRICH CONDITIONS",
@@ -142,3 +162,7 @@ INPUT_FILE_MAPPINGS["geometry_sets_condition_to_geometry_name"] = (
         INPUT_FILE_MAPPINGS["geometry_sets_geometry_to_condition_name"]
     )
 )
+INPUT_FILE_MAPPINGS["four_c_node_type_to_beamme_node_type"] = {
+    "NODE": _bme.node_type.node,
+    "CP": _bme.node_type.control_point,
+}

@@ -487,3 +487,12 @@ class InputFile:
             application_script_lines.extend("# " + line for line in script_file)
 
         return application_script_lines
+
+    def contains_external_mesh_based_geometry(self) -> bool:
+        """Check if the input file contains external mesh-based geometry.
+
+        Returns:
+            True if the input file contains external mesh-based geometry, False otherwise.
+        """
+
+        return False
