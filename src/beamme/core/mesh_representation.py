@@ -32,62 +32,19 @@ from beamme.core.conf import Geometry as _Geometry
 from beamme.core.conf import bme as _bme
 
 MESH_REPRESENTATION_MAPPINGS: dict[str, _Any] = {}
+# fmt: off
 MESH_REPRESENTATION_MAPPINGS[
     "element_type_and_n_nodes_to_connectivity_mapping_beamme_to_vtk"
 ] = {
+
     # Only list the non-standard mappings
-    (_bme.element_type.solid, 20): [
-        0,
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        16,
-        17,
-        18,
-        19,
-        12,
-        13,
-        14,
-        15,
-    ],
-    (_bme.element_type.solid, 27): [
-        0,
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        16,
-        17,
-        18,
-        19,
-        12,
-        13,
-        14,
-        15,
-        24,
-        22,
-        21,
-        23,
-        20,
-        25,
-        26,
-    ],
+    (_bme.element_type.solid, 20):
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 16, 17, 18, 19, 12, 13, 14, 15],
+    (_bme.element_type.solid, 27):
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 16, 17, 18, 19, 12, 13, 14, 15,
+         24, 22, 21, 23, 20, 25, 26],
 }
+# fmt: on
 MESH_REPRESENTATION_MAPPINGS[
     "element_type_and_n_nodes_to_connectivity_mapping_vtk_to_beamme"
 ] = {

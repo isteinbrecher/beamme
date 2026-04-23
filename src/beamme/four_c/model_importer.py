@@ -183,7 +183,7 @@ def _extract_mesh_representation(
     """Extract the mesh representation from mesh data directly contained in the
     input file.
 
-    This will do an inplace removal the mesh data from the provided input file.
+    This will do an inplace removal of the mesh data from the provided input file.
 
     Args:
         input_file: The input file containing the mesh data, will be modified in place.
@@ -370,7 +370,7 @@ def _create_mesh_from_mesh_representation(
             )
 
     # extract elements
-    ## first create the element types
+    #   first create the element types
     element_type_id_to_element_type: dict[int, type] = {}
     for (
         element_type_id,
@@ -393,7 +393,7 @@ def _create_mesh_from_mesh_representation(
             element_technology=element_data["data"],
         )
 
-    ## Loop over the elements and create the mesh elements with the correct type, connectivity and material.
+    #   Loop over the elements and create the mesh elements with the correct type, connectivity and material.
     cell_connectivity = mesh_representation.grid.cell_connectivity
     offsets = mesh_representation.grid.offset
     cell_element_type_ids = mesh_representation.grid.cell_data["element_type_id"]
