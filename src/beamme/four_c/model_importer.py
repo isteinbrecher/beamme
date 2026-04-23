@@ -355,12 +355,8 @@ def _create_mesh_from_mesh_representation(
     mesh.materials.extend(material_id_map.values())
 
     # extract nodes
-    #   For some reason, it is very slow to iterate directly over the points in
-    #   the mesh representation. It is much faster to get a numpy array with
-    #   the point coordinates and iterate over that instead.
-    point_coordinates = _np.array(mesh_representation.grid.points)
     for node_coordinates, node_type in zip(
-        point_coordinates, mesh_representation.grid.point_data["point_type"]
+        mesh_representation.points, mesh_representation.point_data["point_type"]
     ):
         if node_type == _bme.node_type.node.value:
             mesh.nodes.append(_Node(node_coordinates))
@@ -394,15 +390,11 @@ def _create_mesh_from_mesh_representation(
         )
 
     #   Loop over the elements and create the mesh elements with the correct type, connectivity and material.
-    cell_connectivity = mesh_representation.grid.cell_connectivity
-    offsets = mesh_representation.grid.offset
-    cell_element_type_ids = mesh_representation.grid.cell_data["element_type_id"]
-    cell_material_ids = mesh_representation.grid.cell_data["material_id"]
-    for i_cell, (cell_element_type_id_, material_id) in enumerate(
-        zip(cell_element_type_ids, cell_material_ids)
+    for connectivity, cell_element_type_id_, material_id in zip(
+        mesh_representation.connectivity_iterator(),
+        mesh_representation.cell_data["element_type_id"],
+        mesh_representation.cell_data["material_id"],
     ):
-        connectivity = cell_connectivity[offsets[i_cell] : offsets[i_cell + 1]]
-
         element_type = element_type_id_to_element_type[cell_element_type_id_]
 
         reorder_indices = _MESH_REPRESENTATION_MAPPINGS[
@@ -423,10 +415,10 @@ def _create_mesh_from_mesh_representation(
     geometry_sets_in_sections: dict[_Geometry, dict[int, _GeometrySetNodes]] = (
         _defaultdict(dict)
     )
-    for name in mesh_representation.grid.point_data.keys():
+    for name in mesh_representation.point_data.keys():
         info = _string_to_geometry_set_info(name)
         if info is not None:
-            node_indices = _np.nonzero(mesh_representation.grid.point_data[name])[0]
+            node_indices = _np.nonzero(mesh_representation.point_data[name])[0]
             geometry_type = info.geometry_type
             geometry_set = _GeometrySetNodes(
                 geometry_type, nodes=[mesh.nodes[i] for i in node_indices]
