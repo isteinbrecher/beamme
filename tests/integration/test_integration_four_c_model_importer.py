@@ -29,7 +29,7 @@ from beamme.core.mesh import Mesh
 from beamme.four_c.element_beam import Beam3rHerm2Line3
 from beamme.four_c.input_file import InputFile
 from beamme.four_c.model_importer import (
-    _extract_mesh_sections,
+    _extract_materials_from_input_file,
     import_cubitpy_model,
     import_four_c_model,
 )
@@ -113,20 +113,20 @@ def test_integration_four_c_model_importer_import_nested_materials(
     input_file = InputFile()
     input_file.add(mesh)
 
-    # Extract the mesh again. Only one material should be present in the extracted mesh.
-    _, mesh_extracted = _extract_mesh_sections(input_file)
-    assert len(mesh_extracted.materials) == 1
+    # Extract the material from the input file. Only one material should be present in the extracted material map.
+    material_id_map = _extract_materials_from_input_file(input_file)
+    assert len(material_id_map) == 1
 
-    # Check that the imported mesh can be added to a mesh that already contains a
+    # Check that the extracted material can be added to a mesh that already contains a
     # material. This tests that the nested materials are correctly relinked during
     # the import.
     mesh_with_other_material = Mesh()
     mesh_with_other_material.add(
         get_default_test_solid_material(material_type="st_venant_kirchhoff")
     )
+    mesh_with_other_material.add(list(material_id_map.values())[0])
     input_file = InputFile()
     input_file.add(mesh_with_other_material)
-    input_file.add(mesh_extracted)
 
     # Compare with reference file.
     assert_results_close(get_corresponding_reference_file_path(), input_file)
@@ -150,7 +150,7 @@ def test_integration_four_c_model_importer_import_nested_materials_error():
             "Material ID 3 not in material_id_map_all (available IDs: [1, 2])."
         ),
     ):
-        _extract_mesh_sections(input_file)
+        _extract_materials_from_input_file(input_file)
 
 
 @pytest.mark.parametrize("full_import", (False, True))

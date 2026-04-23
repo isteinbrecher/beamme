@@ -89,6 +89,15 @@ class ElementType(_Enum):
     solid = _auto()
 
 
+class NodeType(_Enum):
+    """Enum for node types."""
+
+    node = _auto()
+    cosserat = _auto()
+    control_point = _auto()
+    space_time_cosserat = _auto()
+
+
 class DoubleNodes(_Enum):
     """Enum for handing double nodes in Neumann conditions."""
 
@@ -105,6 +114,7 @@ class BeamMe(object):
         self.bc = BoundaryCondition
         self.coupling_dof = CouplingDofType
         self.element_type = ElementType
+        self.node_type = NodeType
         self.double_nodes = DoubleNodes
 
     def set_default_values(self):
