@@ -46,7 +46,6 @@ class Node:
         # Lists with the objects that this node is linked to.
         self.element_link = []
         self.node_sets_link = []
-        self.element_partner_index = None
         self.mesh = None
 
         # If this node is replaced, store a link to the remaining node.

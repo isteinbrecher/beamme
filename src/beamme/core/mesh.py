@@ -752,11 +752,6 @@ class Mesh:
                     "There are multiple middle nodes with the same coordinates!"
                 )
 
-            # Add the partner index to the middle nodes.
-            for i_partner, partners in enumerate(partner_indices):
-                for i_node in partners:
-                    middle_nodes[i_node].element_partner_index = i_partner
-
     def get_vtk_representation(
         self, *, overlapping_elements=True, coupling_sets=False, **kwargs
     ):
