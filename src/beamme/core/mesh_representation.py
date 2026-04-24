@@ -23,9 +23,9 @@
 
 from dataclasses import dataclass as _dataclass
 from typing import Any as _Any
+from typing import Iterable as _Iterable
 
 import numpy as _np
-import pyvista as _pv
 from numpy.typing import NDArray as _NDArray
 
 from beamme.core.conf import Geometry as _Geometry
@@ -111,48 +111,105 @@ class MeshRepresentation:
         cell_data: dict[str, _NDArray | None] | None = None,
         point_data: dict[str, _NDArray | None] | None = None,
     ):
-        if cell_connectivity is None or len(cell_connectivity) == 0:
-            # In this case, we have an empty mesh representation.
-            # Safety check that all provided data is None or empty
-            if (
-                (cell_types is not None and len(cell_types) > 0)
-                or (points is not None and len(points) > 0)
-                or (geometry_sets is not None and len(geometry_sets) > 0)
-                or (cell_data is not None and len(cell_data) > 0)
-                or (point_data is not None and len(point_data) > 0)
-            ):
-                raise ValueError(
-                    "If cell_connectivity is None or empty, all other data must be None or empty as well."
+        def _convert_argument_numpy(
+            argument: _NDArray | None,
+            default_shape: tuple[int, ...],
+            dtype: type,
+        ) -> _NDArray:
+            """Convert given array arguments so we can store them in this
+            object."""
+            if argument is None:
+                return _np.empty(default_shape, dtype=dtype)
+            else:
+                return _np.asarray(argument, dtype=dtype)
+
+        def _filter_none_entries(
+            argument: dict[str, _NDArray | None] | None, expected_size: int
+        ) -> dict[str, _NDArray]:
+            """Check if a dictionary is given, and if so, filter None entries
+            from it."""
+            if argument is None:
+                return {}
+            else:
+                data = {
+                    key: _np.asarray(value)
+                    for key, value in argument.items()
+                    if value is not None
+                }
+                for key, value in data.items():
+                    if len(value) != expected_size:
+                        raise ValueError(
+                            f"Data field {key} has size {len(value)}, but expected size is {expected_size}."
+                        )
+                return data
+
+        self.cell_connectivity = _convert_argument_numpy(
+            cell_connectivity, default_shape=(0,), dtype=int
+        )
+        self.cell_types = _convert_argument_numpy(
+            cell_types, default_shape=(0,), dtype=int
+        )
+        self.points = _convert_argument_numpy(points, default_shape=(0, 3), dtype=float)
+
+        self.cell_data = _filter_none_entries(cell_data, len(self.cell_types))
+        self.point_data = _filter_none_entries(point_data, len(self.points))
+
+        def _store_geometry_set_data(
+            data_field: str,
+            name: str,
+            field_vector: _NDArray | None,
+            expected_size: int,
+        ) -> None:
+            """Store point or cell data defining a geometry set."""
+            if field_vector is not None:
+                if len(field_vector) != expected_size:
+                    raise ValueError(
+                        f"Geometry set {name} has size {len(field_vector)},"
+                        f" but expected size is {expected_size}."
+                    )
+                getattr(self, data_field)[str(name)] = field_vector
+
+        if geometry_sets is not None:
+            for geometry_set in geometry_sets:
+                geometry_set_name = str(geometry_set)
+                _store_geometry_set_data(
+                    "point_data",
+                    geometry_set_name,
+                    geometry_set.point_flag_vector,
+                    len(self.points),
                 )
-            self._grid = None
-        else:
-            # We use a unstructured vtk grid as main mesh data structure
-            self._grid = _pv.UnstructuredGrid(cell_connectivity, cell_types, points)
+                _store_geometry_set_data(
+                    "cell_data",
+                    geometry_set_name,
+                    geometry_set.cell_flag_vector,
+                    len(self.cell_types),
+                )
 
-            # Store node set information
-            if geometry_sets is not None:
-                for node_set in geometry_sets:
-                    self._grid.point_data[str(node_set)] = node_set.point_flag_vector
+        # Get the offset array so we can iterate over the connectivity in a
+        # performant manner.
+        self.cell_connectivity_offsets = _np.zeros(len(self.cell_types) + 1, dtype=int)
+        for i_cell in range(len(self.cell_types)):
+            last_offset = self.cell_connectivity_offsets[i_cell]
+            if last_offset >= len(self.cell_connectivity):
+                raise ValueError(
+                    "Invalid offset, is larger than the size of the connectivity."
+                )
+            cell_size = self.cell_connectivity[last_offset]
+            if cell_size < 1:
+                raise ValueError("Invalid offset, has to be at least 1.")
+            self.cell_connectivity_offsets[i_cell + 1] = (
+                cell_size + self.cell_connectivity_offsets[i_cell] + 1
+            )
+        if self.cell_connectivity_offsets[-1] != len(self.cell_connectivity):
+            raise ValueError("Invalid cell connectivity offsets.")
 
-            # Store the required data in the grid.
-            for data, attribute_name in (
-                (cell_data, "cell_data"),
-                (point_data, "point_data"),
-            ):
-                if data is not None:
-                    data_attribute = getattr(self._grid, attribute_name)
-                    for key, value in data.items():
-                        if value is not None:
-                            data_attribute[key] = value
+    def connectivity_iterator(self) -> _Iterable:
+        """Return an iterator over the cell connectivity.
 
-    def is_empty(self) -> bool:
-        """Return True if this mesh representation is empty, i.e., it does not
-        contain any grid."""
-        return self._grid is None
-
-    @property
-    def grid(self) -> _pv.UnstructuredGrid:
-        """Return the internal grid of this mesh representation."""
-        if self.is_empty():
-            raise ValueError("This mesh representation does not contain a grid.")
-        return self._grid
+        Returns:
+            An iterator that returns the connectivity array for each cell.
+        """
+        for i in range(len(self.cell_types)):
+            start = self.cell_connectivity_offsets[i] + 1
+            end = self.cell_connectivity_offsets[i + 1]
+            yield self.cell_connectivity[start:end]
