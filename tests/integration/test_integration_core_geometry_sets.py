@@ -43,8 +43,6 @@ def test_integration_core_geometry_set_replace_nodes_geometry_set(
 ):
     """Test case for coupling of nodes, and reusing the identical nodes."""
 
-    bme.check_overlapping_elements = False
-
     mat = get_default_test_beam_material(material_type="reissner")
     rot = Rotation([1, 2, 43], 213123)
 

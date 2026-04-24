@@ -130,8 +130,5 @@ class BeamMe(object):
         # match.
         self.allow_beam_rotation = True
 
-        # Check for overlapping elements when creating an input file.
-        self.check_overlapping_elements = True
-
 
 bme = BeamMe()

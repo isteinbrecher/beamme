@@ -141,24 +141,6 @@ class Beam(_Element):
             point_data["base_vector_2"][i_node] = rotation_matrix[:, 1]
             point_data["base_vector_3"][i_node] = rotation_matrix[:, 2]
 
-        # We can output the element partner index, which is a debug quantity to help find elements
-        # with matching middle nodes. This is usually an indicator for an issue with the mesh.
-        # TODO: Check if we really need this partner index output any more
-        element_partner_indices = list(
-            [
-                node.element_partner_index
-                for node in self.nodes
-                if node.element_partner_index is not None
-            ]
-        )
-        if len(element_partner_indices) > 1:
-            raise ValueError(
-                "More than one element partner indices are currently not supported in the output"
-                "functionality"
-            )
-        elif len(element_partner_indices) == 1:
-            cell_data["partner_index"] = element_partner_indices[0] + 1
-
         # Check if we have everything we need to write output or if we need to calculate additional
         # points for a smooth beam visualization.
         if beam_centerline_visualization_segments == 1:

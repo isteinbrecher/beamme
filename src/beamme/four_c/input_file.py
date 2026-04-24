@@ -260,9 +260,6 @@ class InputFile:
             mesh: The mesh to be added to the input file.
         """
 
-        if _bme.check_overlapping_elements:
-            mesh.check_overlapping_elements()
-
         # Compute geometry-set starting indices
         start_index_geometry_set = max(
             (

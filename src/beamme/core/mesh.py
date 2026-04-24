@@ -56,9 +56,6 @@ from beamme.core.vtk_writer import VTKWriter as _VTKWriter
 from beamme.geometric_search.find_close_points import (
     find_close_points as _find_close_points,
 )
-from beamme.geometric_search.find_close_points import (
-    point_partners_to_partner_indices as _point_partners_to_partner_indices,
-)
 from beamme.utils.environment import is_testing as _is_testing
 from beamme.utils.nodes import filter_nodes as _filter_nodes
 from beamme.utils.nodes import find_close_nodes as _find_close_nodes
@@ -717,56 +714,11 @@ class Mesh:
         """Return all nodes for which the function evaluates to true."""
         return _get_nodes_by_function(self.nodes, *args, **kwargs)
 
-    def check_overlapping_elements(self, raise_error=True):
-        """Check if there are overlapping elements in the mesh.
-
-        This is done by checking if all middle nodes of beam elements
-        have unique coordinates in the mesh.
-        """
-
-        # Number of middle nodes.
-        middle_nodes = [node for node in self.nodes if node.is_middle_node]
-
-        # Only check if there are middle nodes.
-        if len(middle_nodes) == 0:
-            return
-
-        # Get array with middle nodes.
-        coordinates = _np.zeros([len(middle_nodes), 3])
-        for i, node in enumerate(middle_nodes):
-            coordinates[i, :] = node.coordinates
-
-        # Check if there are double entries in the coordinates.
-        has_partner, partner = _find_close_points(coordinates)
-        partner_indices = _point_partners_to_partner_indices(has_partner, partner)
-        if partner > 0:
-            if raise_error:
-                raise ValueError(
-                    "There are multiple middle nodes with the "
-                    "same coordinates. Per default this raises an error! "
-                    "This check can be turned of with "
-                    "bme.check_overlapping_elements=False"
-                )
-            else:
-                _warnings.warn(
-                    "There are multiple middle nodes with the same coordinates!"
-                )
-
-            # Add the partner index to the middle nodes.
-            for i_partner, partners in enumerate(partner_indices):
-                for i_node in partners:
-                    middle_nodes[i_node].element_partner_index = i_partner
-
-    def get_vtk_representation(
-        self, *, overlapping_elements=True, coupling_sets=False, **kwargs
-    ):
+    def get_vtk_representation(self, *, coupling_sets=False, **kwargs):
         """Return a vtk representation of the beams and solid in this mesh.
 
         Args
         ----
-        overlapping_elements: bool
-            I elements should be checked for overlapping. If they overlap, the
-            output will mark them.
         coupling_sets: bool
             If coupling sets should also be displayed.
         """
@@ -787,10 +739,6 @@ class Mesh:
         # Set the bme value.
         digits = len(str(max_sets))
         _bme.vtk_node_set_format = "{:0" + str(digits) + "}"
-
-        if overlapping_elements:
-            # Check for overlapping elements.
-            self.check_overlapping_elements(raise_error=False)
 
         # Get representation of elements.
         for element in self.elements:
