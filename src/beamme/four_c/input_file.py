@@ -283,6 +283,10 @@ class InputFile:
             for section in ("FLUID ELEMENTS", "STRUCTURE ELEMENTS")
         )
 
+        start_index_nurbs_patches = len(
+            self.sections.get("STRUCTURE KNOTVECTORS", {}).get("PATCHES", [])
+        )
+
         start_index_functions = max(
             (
                 int(section.split("FUNCT")[-1])
@@ -314,8 +318,7 @@ class InputFile:
         if len(mesh.elements) != len(set(mesh.elements)):
             raise ValueError("Elements are not unique!")
         i = start_index_elements
-        nurbs_count = 0
-
+        nurbs_count = start_index_nurbs_patches
         for element in mesh.elements:
             if isinstance(element, _NURBSPatch):
                 element.i_global_start = i

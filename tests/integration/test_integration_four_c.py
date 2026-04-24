@@ -46,6 +46,7 @@ from beamme.four_c.input_file import InputFile
 from beamme.four_c.model_importer import import_four_c_model
 from beamme.mesh_creation_functions.beam_line import create_beam_mesh_line
 from beamme.mesh_creation_functions.nurbs_generic import add_splinepy_nurbs_to_mesh
+from beamme.mesh_creation_functions.nurbs_utils import translate_splinepy
 
 
 @pytest.mark.parametrize(
@@ -387,6 +388,70 @@ def test_integration_four_c_nurbs_import(
     input_file.add(mesh)
 
     # Compare with the reference solution.
+    assert_results_close(get_corresponding_reference_file_path(), input_file)
+
+
+def test_integration_four_c_nurbs_multiple_additions_to_input_file(
+    get_default_test_solid_element,
+    get_default_test_solid_material,
+    get_default_test_beam_material,
+    assert_results_close,
+    get_corresponding_reference_file_path,
+):
+    """In this test, we add a NURBS patch to an input file, then a beam and
+    then a second NURBS patch.
+
+    This checks that we can add multiple NURBS patches to the input file
+    and that the patch IDs are represented correctly.
+    """
+
+    def create_nurbs_brick(n_el_dim):
+        """Create a NURBS brick with the given number of elements in each
+        direction."""
+        box_dimensions = [1.5, 3.0, 2.4]
+        vol_obj = splinepy.helpme.create.box(*box_dimensions).nurbs
+        vol_obj.elevate_degrees([0, 1, 2])
+        for i_dim, n_el in enumerate(n_el_dim):
+            vol_obj.insert_knots(i_dim, np.linspace(0, 1, n_el + 1))
+        return vol_obj
+
+    brick_1 = create_nurbs_brick([1, 2, 3])
+    brick_2 = create_nurbs_brick([3, 1, 2])
+    translate_splinepy(brick_2, [3, 0, 0])
+
+    def create_mesh(nurbs_obj):
+        """Create a mesh with the given NURBS object."""
+        mesh = Mesh()
+        element_type = get_default_test_solid_element("nurbs_3d")
+        patch_set = add_splinepy_nurbs_to_mesh(
+            mesh,
+            element_type,
+            nurbs_obj,
+            material=get_default_test_solid_material(
+                material_type="st_venant_kirchhoff"
+            ),
+        )
+        mesh.add(patch_set)
+        return mesh
+
+    mesh_1 = create_mesh(brick_1)
+    mesh_2 = create_mesh(brick_2)
+
+    # Create the input file. Add the first block first, then a beam and then the second block.
+    input_file = InputFile()
+    input_file.add(mesh_1)
+
+    mesh_beam = Mesh()
+    mat = get_default_test_beam_material(material_type="reissner")
+    beam_set = create_beam_mesh_line(
+        mesh_beam, Beam3rHerm2Line3, mat, [-1.0, 0.0, 0.0], [1.0, 0.0, 0.0], n_el=2
+    )
+    mesh_beam.add(beam_set)
+    input_file.add(mesh_beam)
+
+    input_file.add(mesh_2)
+
+    # Compare with the reference file
     assert_results_close(get_corresponding_reference_file_path(), input_file)
 
 
