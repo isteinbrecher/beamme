@@ -128,10 +128,6 @@ class AbaqusInputFile(object):
     def get_input_file_string(self, normal_definition):
         """Generate the string for the Abaqus input file."""
 
-        # Perform some checks on the mesh.
-        if _bme.check_overlapping_elements:
-            self.mesh.check_overlapping_elements()
-
         # Assign global indices to all materials
         set_i_global(self.mesh.materials)
 
