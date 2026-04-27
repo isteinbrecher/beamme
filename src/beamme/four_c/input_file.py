@@ -162,6 +162,17 @@ class InputFile:
         else:
             self.fourc_input.combine_sections(object_to_add)
 
+    def get_fourcipp_input_with_mesh(self) -> _FourCInput:
+        """Return a copy of the FourCIPP input file with the contents of the
+        mesh representation dumped to the legacy sections."""
+        fourc_input = self.fourc_input.copy()
+        _dump_mesh_representation_to_input_file_legacy(
+            fourc_input,
+            self.mesh_representation,
+            self.element_type_id_to_data,
+        )
+        return fourc_input
+
     def dump(
         self,
         input_file_path: str | _Path,
