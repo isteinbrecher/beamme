@@ -151,8 +151,8 @@ class MeshRepresentation:
         )
         self.points = _convert_argument_numpy(points, default_shape=(0, 3), dtype=float)
 
-        self.cell_data = _filter_none_entries(cell_data, len(self.cell_types))
-        self.point_data = _filter_none_entries(point_data, len(self.points))
+        self.cell_data = _filter_none_entries(cell_data, self.n_cells)
+        self.point_data = _filter_none_entries(point_data, self.n_points)
 
         def _store_geometry_set_data(
             data_field: str,
@@ -176,19 +176,19 @@ class MeshRepresentation:
                     "point_data",
                     geometry_set_name,
                     geometry_set.point_flag_vector,
-                    len(self.points),
+                    self.n_points,
                 )
                 _store_geometry_set_data(
                     "cell_data",
                     geometry_set_name,
                     geometry_set.cell_flag_vector,
-                    len(self.cell_types),
+                    self.n_cells,
                 )
 
         # Get the offset array so we can iterate over the connectivity in a
         # performant manner.
-        self.cell_connectivity_offsets = _np.zeros(len(self.cell_types) + 1, dtype=int)
-        for i_cell in range(len(self.cell_types)):
+        self.cell_connectivity_offsets = _np.zeros(self.n_cells + 1, dtype=int)
+        for i_cell in range(self.n_cells):
             last_offset = self.cell_connectivity_offsets[i_cell]
             if last_offset >= len(self.cell_connectivity):
                 raise ValueError(
@@ -203,13 +203,31 @@ class MeshRepresentation:
         if self.cell_connectivity_offsets[-1] != len(self.cell_connectivity):
             raise ValueError("Invalid cell connectivity offsets.")
 
+    @property
+    def n_cells(self) -> int:
+        """Return the number of cells in this mesh representation.
+
+        Returns:
+            Number of cells in this mesh representation.
+        """
+        return len(self.cell_types)
+
+    @property
+    def n_points(self) -> int:
+        """Return the number of points in this mesh representation.
+
+        Returns:
+            Number of points in this mesh representation.
+        """
+        return len(self.points)
+
     def connectivity_iterator(self) -> _Iterable:
         """Return an iterator over the cell connectivity.
 
         Returns:
             An iterator that returns the connectivity array for each cell.
         """
-        for i in range(len(self.cell_types)):
+        for i in range(self.n_cells):
             start = self.cell_connectivity_offsets[i] + 1
             end = self.cell_connectivity_offsets[i + 1]
             yield self.cell_connectivity[start:end]
