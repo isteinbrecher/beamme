@@ -140,6 +140,7 @@ def test_integration_core_vtk_writer_beam(
         binary=False,
         coupling_sets=True,
     )
+    # TODO: Replace this test in the future once we have moved to a new vtu output.
     # assert_results_close(ref_file, vtk_file)
 
     # Write VTK output, without coupling sets."""
@@ -153,6 +154,7 @@ def test_integration_core_vtk_writer_beam(
         binary=False,
         coupling_sets=False,
     )
+    # TODO: Replace this test in the future once we have moved to a new vtu output.
     # assert_results_close(ref_file, vtk_file)
 
     # Write VTK output, with coupling sets and additional points for visualization."""
@@ -167,6 +169,7 @@ def test_integration_core_vtk_writer_beam(
         binary=False,
         beam_centerline_visualization_segments=3,
     )
+    # TODO: Replace this test in the future once we have moved to a new vtu output.
     # assert_results_close(ref_file, vtk_file)
 
 
@@ -189,6 +192,7 @@ def test_integration_core_vtk_writer_solid(
     mesh.write_vtk(output_name="test", output_directory=tmp_path, binary=False)
 
     # Compare the vtk files.
+    # TODO: Replace this test in the future once we have moved to a new vtu output.
     # assert_results_close(ref_file, vtk_file)
 
 
@@ -213,6 +217,7 @@ def test_integration_core_vtk_writer_solid_elements(
     mesh.write_vtk(output_name="test", output_directory=tmp_path, binary=False)
 
     # Compare the vtk files.
+    # TODO: Replace this test in the future once we have moved to a new vtu output.
     # assert_results_close(ref_file, vtk_file)
 
 
