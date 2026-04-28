@@ -40,12 +40,6 @@ from beamme.four_c.four_c_types import BeamType as _BeamType
 from beamme.four_c.input_file_mappings import (
     INPUT_FILE_MAPPINGS as _INPUT_FILE_MAPPINGS,
 )
-from beamme.four_c.material import MaterialEulerBernoulli as _MaterialEulerBernoulli
-from beamme.four_c.material import MaterialKirchhoff as _MaterialKirchhoff
-from beamme.four_c.material import MaterialReissner as _MaterialReissner
-from beamme.four_c.material import (
-    MaterialReissnerElastoplastic as _MaterialReissnerElastoplastic,
-)
 
 
 def get_four_c_reissner_beam(n_nodes: int, is_hermite_centerline: bool) -> type[_Beam]:
@@ -71,7 +65,6 @@ def get_four_c_reissner_beam(n_nodes: int, is_hermite_centerline: bool) -> type[
             "element_type": _bme.element_type.beam,
             "beam_type": _BeamType.reissner,
             "data": {four_c_type: {four_c_cell: element_technology}},
-            "valid_materials": [_MaterialReissner, _MaterialReissnerElastoplastic],
             "coupling_fix_dict": coupling_fix_dict,
             "coupling_joint_dict": coupling_joint_dict,
         },
@@ -117,7 +110,6 @@ def get_four_c_kirchhoff_beam(
             "beam_type": _BeamType.kirchhoff,
             "kirchhoff_parametrization": parametrization,
             "data": {four_c_type: {four_c_cell: element_technology}},
-            "valid_materials": [_MaterialKirchhoff],
             "coupling_fix_dict": coupling_fix_dict,
             "coupling_joint_dict": coupling_joint_dict,
         },
@@ -136,8 +128,6 @@ class BeamFourCEulerBernoulli(_Beam2):
             ]: {}
         }
     }
-
-    valid_materials = [_MaterialEulerBernoulli]
 
     def check(self) -> None:
         """Check that the beam is straight and that the two rotations are the
