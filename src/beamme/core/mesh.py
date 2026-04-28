@@ -837,8 +837,8 @@ class Mesh:
 
             if isinstance(element, _NURBSPatch):
                 n_patch_elements = element.get_number_of_elements()
-                # We can to a cast here, since we know that we have set i_global previously
-                # for all elements.
+                # To satisfy mypy, we do a cast here, since we know that we have set
+                # i_global previously for all elements.
                 element_i_global = _cast(int, element.i_global)
                 data_assignment_slice = slice(
                     element_i_global, element_i_global + n_patch_elements
