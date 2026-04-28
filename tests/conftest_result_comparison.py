@@ -186,7 +186,7 @@ def convert_to_primitive_type(
         obj = input_file
 
     if isinstance(obj, InputFile):
-        # Create a copy of the FourCIPP input file and dump the mesh representation to it.
+        # Create a copy of the 4C input file via FourCIPP and dump the mesh representation to it.
         fourc_input_file = obj.fourc_input.copy()
         dump_mesh_representation_to_input_file_legacy(
             fourc_input_file, obj.mesh_representation, obj.element_type_id_to_data

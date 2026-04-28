@@ -169,7 +169,7 @@ def dump_mesh_to_input_file(input_file, mesh: _Mesh) -> None:
     Internally, we store the geometry information from the mesh in the mesh
     representation of the input file. All other information, e.g., element
     types, materials, boundary conditions and functions will be dumped to the
-    FourCIPP input file.
+    4C input file via FourCIPP.
 
     Args:
         input_file: The input file where we want to add the mesh information.
@@ -329,11 +329,11 @@ def dump_mesh_representation_to_input_file_legacy(
     mesh_representation: _MeshRepresentation,
     element_type_id_to_data: dict[int, dict],
 ) -> None:
-    """Dump the information contained in the mesh representation to the
-    FourCIPP input file, in legacy format.
+    """Dump the information contained in the mesh representation to the 4C
+    input file via FourCIPP, in legacy format.
 
     Args:
-        fourc_input: FourCIPP input file where the mesh information data will be dumped to.
+        fourc_input: 4C input file via FourCIPP where the mesh information data will be dumped to.
         mesh_representation: The mesh representation that is added to the input file.
         element_type_id_to_data: The mapping between element type ID and the element type data.
     """
