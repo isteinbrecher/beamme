@@ -37,7 +37,6 @@ from beamme.core.nurbs_patch import NURBSVolume as _NURBSVolume
 from beamme.four_c.input_file_mappings import (
     INPUT_FILE_MAPPINGS as _INPUT_FILE_MAPPINGS,
 )
-from beamme.four_c.material import MaterialSolid as _MaterialSolid
 
 
 def get_four_c_solid(
@@ -105,14 +104,11 @@ def get_four_c_solid(
     four_c_cell = _INPUT_FILE_MAPPINGS["element_type_and_n_nodes_to_four_c_cell"][
         solid_type, n_nodes
     ]
-    # All elements, except for the point element (i.e., rigid sphere), require a solid material.
-    valid_materials = [_MaterialSolid] if base_type is not _VolumePoint else None
     return type(
         "FourCSolidElementType",
         (base_type,),
         {
             "element_type": solid_type,
             "data": {four_c_type: {four_c_cell: element_technology}},
-            "valid_materials": valid_materials,
         },
     )
