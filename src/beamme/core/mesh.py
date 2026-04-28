@@ -831,7 +831,8 @@ class Mesh:
             else:
                 element_type_id = element_type_to_id[type(element)]
 
-            # Some elements don't require a material, in this case we set the material id to -1.
+            # For elements which don't require a material we set the material id to -1.
+            # This is currently only the case for rigid sphere elements in 4C.
             material_id = material_to_i_global.get(element.material, -1)
 
             if isinstance(element, _NURBSPatch):
