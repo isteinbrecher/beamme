@@ -151,18 +151,6 @@ def dump_nurbs_patch_knotvectors(input_file, nurbs_patch: _NURBSPatch) -> None:
     input_file.add({"STRUCTURE KNOTVECTORS": {"PATCHES": patches}})
 
 
-def dump_item(item) -> dict[str, _Any]:
-    """General function to dump items to a 4C input file."""
-    if hasattr(item, "dump_to_list"):
-        return item.dump_to_list()
-    elif isinstance(item, _BoundaryCondition):
-        return {"E": item.geometry_set, **item.data}
-    elif isinstance(item, _Coupling):
-        return dump_coupling(item)
-    else:
-        raise TypeError(f"Could not dump {item}")
-
-
 def dump_mesh_to_input_file(input_file, mesh: _Mesh) -> None:
     """Add a mesh to the input file.
 
@@ -281,7 +269,16 @@ def dump_mesh_to_input_file(input_file, mesh: _Mesh) -> None:
             return
         dumped: list[_Any] = []
         for item in items:
-            dumped.append(dump_item(item))
+            dump_item = None
+            if hasattr(item, "dump_to_list"):
+                dump_item = item.dump_to_list()
+            elif isinstance(item, _BoundaryCondition):
+                dump_item = {"E": item.geometry_set, **item.data}
+            elif isinstance(item, _Coupling):
+                dump_item = dump_coupling(item)
+            else:
+                raise TypeError(f"Could not dump {item}")
+            dumped.append(dump_item)
 
         # Go through FourCIPP to convert to native types
         full_item_list = input_file.pop(section_name, [])
