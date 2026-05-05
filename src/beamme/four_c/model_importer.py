@@ -167,13 +167,13 @@ def _extract_mesh_from_input_file(input_file: _InputFile) -> tuple[_InputFile, _
         (
             mesh_representation,
             element_type_id_to_data,
-            node_set_internal_id_to_legacy_id,
+            node_set_id_mesh_representation_to_input_file,
         ) = _extract_mesh_representation(input_file)
     return _create_mesh_from_mesh_representation(
         input_file,
         mesh_representation,
         element_type_id_to_data,
-        node_set_internal_id_to_legacy_id,
+        node_set_id_mesh_representation_to_input_file,
     )
 
 
@@ -189,10 +189,12 @@ def _extract_mesh_representation(
         input_file: The input file containing the mesh data, will be modified in place.
 
     Returns:
-        A tuple (mesh_representation, element_type_id_to_data, node_set_internal_id_to_legacy_id).
+        A tuple containing:
         - `mesh_representation`: Contains the mesh data extracted from the input file.
-        - `element_type_id_to_data`: A mapping between the element type ID and the element data.
-        - `node_set_internal_id_to_legacy_id`: A mapping that can be used to map the IDs in the mesh representation to legacy node set IDs.
+        - `element_type_id_to_data`: A mapping between the element type ID and the
+            element data.
+        - `node_set_id_mesh_representation_to_input_file`: A mapping that can be used
+            to map the IDs in the mesh representation to the IDs in the input file.
     """
 
     # extract nodes
@@ -265,7 +267,7 @@ def _extract_mesh_representation(
 
     # extract geometry sets
     node_sets: list[_GeometrySetInfo] = []
-    node_set_internal_id_to_legacy_id: dict[int, int] = {}
+    node_set_id_mesh_representation_to_input_file: dict[int, int] = {}
     for section_name in input_file.sections:
         if not section_name.endswith("TOPOLOGY"):
             continue
@@ -287,7 +289,7 @@ def _extract_mesh_representation(
         for entry in items:
             geom_dict[entry["d_id"]].add(entry["node_id"] - 1)
 
-        for legacy_node_set_id, node_ids in geom_dict.items():
+        for input_file_node_set_id, node_ids in geom_dict.items():
             node_set_id = len(node_sets)
 
             node_set_flag = _np.zeros(n_nodes, dtype=int)
@@ -301,7 +303,9 @@ def _extract_mesh_representation(
                 )
             )
 
-            node_set_internal_id_to_legacy_id[node_set_id] = legacy_node_set_id
+            node_set_id_mesh_representation_to_input_file[node_set_id] = (
+                input_file_node_set_id
+            )
 
     # Create the mesh representation and add the extracted data to it.
     mesh_representation = _MeshRepresentation(
@@ -322,7 +326,7 @@ def _extract_mesh_representation(
     return (
         mesh_representation,
         element_type_tracker.unique_id_to_data,
-        node_set_internal_id_to_legacy_id,
+        node_set_id_mesh_representation_to_input_file,
     )
 
 
@@ -330,16 +334,16 @@ def _create_mesh_from_mesh_representation(
     input_file,
     mesh_representation,
     element_type_id_to_data,
-    node_set_internal_id_to_legacy_id,
+    node_set_id_mesh_representation_to_input_file,
 ) -> tuple[_InputFile, _Mesh]:
     """Extract a BeamMe mesh from a mesh representation.
 
     Args:
         input_file: The input file containing general data.
         mesh_representation: The mesh representation to convert.
-        node_set_internal_id_to_legacy_id: A mapping of the mesh representation
-            internal node set IDs to legacy node set IDs, which can be used to
-            link the geometry sets in the input file to the node sets in the mesh
+        node_set_id_mesh_representation_to_input_file: A mapping of the mesh
+            representation node set IDs to input file IDs, which can be used to link
+            the geometry sets in the input file to the node sets in the mesh
             representation.
 
     Returns:
@@ -365,8 +369,7 @@ def _create_mesh_from_mesh_representation(
                 f"Mesh conversion for node type {_bme.node_type(node_type).name} is not implemented!"
             )
 
-    # extract elements
-    #   first create the element types
+    # extract element types
     element_type_id_to_element_type: dict[int, type] = {}
     for (
         element_type_id,
@@ -389,7 +392,7 @@ def _create_mesh_from_mesh_representation(
             element_technology=element_data["data"],
         )
 
-    #   Loop over the elements and create the mesh elements with the correct type, connectivity and material.
+    # loop over the elements and create the mesh elements with the correct type, connectivity and material.
     for connectivity, cell_element_type_id_, material_id in zip(
         mesh_representation.connectivity_iterator(),
         mesh_representation.cell_data["element_type_id"],
@@ -423,8 +426,8 @@ def _create_mesh_from_mesh_representation(
             geometry_set = _GeometrySetNodes(
                 geometry_type, nodes=[mesh.nodes[i] for i in node_indices]
             )
-            legacy_id = node_set_internal_id_to_legacy_id[info.i_global]
-            geometry_sets_in_sections[geometry_type][legacy_id] = geometry_set
+            input_file_id = node_set_id_mesh_representation_to_input_file[info.i_global]
+            geometry_sets_in_sections[geometry_type][input_file_id] = geometry_set
             mesh.add(geometry_set)
 
     # extract boundary conditions

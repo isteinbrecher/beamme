@@ -183,7 +183,7 @@ def convert_to_primitive_type(
         obj = input_file
 
     if isinstance(obj, InputFile):
-        return obj.sections
+        return obj.get_fourcipp_input_with_mesh().sections
 
     if isinstance(obj, str):
         # Comparison for string based Abaqus input files
