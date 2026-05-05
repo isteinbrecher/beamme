@@ -235,14 +235,16 @@ def beam_to_space_time(
     for coupling in mesh_space_reference.boundary_conditions[
         _bme.bc.point_coupling, _bme.geo.point
     ]:
+        coupling_node_ids = [
+            node.i_global for node in coupling.geometry_set.get_points()
+        ]
         for i_mesh_space in range(number_of_copies_in_time):
-            coupling_node_ids = [
-                node.i_global for node in coupling.geometry_set.get_points()
-            ]
             space_time_couplings.append(
                 _Coupling(
                     [
-                        space_time_nodes[node_id + number_of_nodes_in_space]
+                        space_time_nodes[
+                            node_id + i_mesh_space * number_of_nodes_in_space
+                        ]
                         for node_id in coupling_node_ids
                     ],
                     coupling.bc_type,
