@@ -102,10 +102,10 @@ def test_integration_four_c_sub_materials_material_numbering(
                 },
                 {
                     "MAT": 11,
-                    "VISCO_GenMax": {
+                    "VISCO_FSLS": {
                         "TAU": 0.1,
+                        "ALPHA": 0.5,
                         "BETA": 0.4,
-                        "SOLVE": "OST",
                     },
                 },
                 {

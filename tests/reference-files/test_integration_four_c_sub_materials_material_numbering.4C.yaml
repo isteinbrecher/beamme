@@ -9,9 +9,9 @@ MATERIALS:
       YOUNG: 0.16
     MAT: 10
   - MAT: 11
-    VISCO_GenMax:
+    VISCO_FSLS:
+      ALPHA: 0.5
       BETA: 0.4
-      SOLVE: "OST"
       TAU: 0.1
   - ELAST_CoupAnisoExpo:
       GAMMA: 0
