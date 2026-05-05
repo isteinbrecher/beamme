@@ -235,14 +235,16 @@ def beam_to_space_time(
     for coupling in mesh_space_reference.boundary_conditions[
         _bme.bc.point_coupling, _bme.geo.point
     ]:
+        coupling_node_ids = [
+            node.i_global for node in coupling.geometry_set.get_points()
+        ]
         for i_mesh_space in range(number_of_copies_in_time):
-            coupling_node_ids = [
-                node.i_global for node in coupling.geometry_set.get_points()
-            ]
             space_time_couplings.append(
                 _Coupling(
                     [
-                        space_time_nodes[node_id + number_of_nodes_in_space]
+                        space_time_nodes[
+                            node_id + i_mesh_space * number_of_nodes_in_space
+                        ]
                         for node_id in coupling_node_ids
                     ],
                     coupling.bc_type,
@@ -307,11 +309,10 @@ def mesh_to_data_arrays(mesh: _Mesh):
     node_sets: _Dict[str, _Dict] = {}
     for value in geometry_sets.values():
         for geometry_set in value:
-            node_set_data = {
-                "node_ids": _np.array(
-                    [node.i_global for node in geometry_set.get_all_nodes()]
-                )
-            }
+            node_ids = sorted(
+                list(set(node.i_global for node in geometry_set.get_all_nodes()))
+            )
+            node_set_data = {"node_ids": node_ids}
             if geometry_set.name is not None:
                 node_set_data["name"] = geometry_set.name
             node_sets[str(len(node_sets) + 1)] = node_set_data
