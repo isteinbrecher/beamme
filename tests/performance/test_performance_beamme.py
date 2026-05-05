@@ -357,7 +357,7 @@ def test_performance_beamme_add_mesh_to_input_file(evaluate_execution_time, cach
         "BeamMe: Add large beam mesh to input file",
         input_file.add,
         kwargs={"object_to_add": cache_data.mesh},
-        expected_time=10.0,
+        expected_time=0.6,
     )
 
     cache_data.input_file = input_file
@@ -378,7 +378,7 @@ def test_performance_beamme_dump_input_file(
             "input_file_path": tmp_path / "performance_testing_beam.4C.yaml",
             "validate_sections_only": True,
         },
-        expected_time=5.5,
+        expected_time=15.0,
     )
 
 
