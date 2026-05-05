@@ -37,10 +37,10 @@ from fourcipp.utils.not_set import NOT_SET as _NOT_SET
 from beamme.core.conf import INPUT_FILE_HEADER as _INPUT_FILE_HEADER
 from beamme.core.mesh import Mesh as _Mesh
 from beamme.core.mesh_representation import MeshRepresentation as _MeshRepresentation
-from beamme.four_c.input_file_dump_item import (
+from beamme.four_c.input_file_dump_functions import (
     dump_mesh_representation_to_input_file_legacy as _dump_mesh_representation_to_input_file_legacy,
 )
-from beamme.four_c.input_file_dump_item import (
+from beamme.four_c.input_file_dump_functions import (
     dump_mesh_to_input_file as _dump_mesh_to_input_file,
 )
 from beamme.utils.environment import cubitpy_is_available as _cubitpy_is_available
