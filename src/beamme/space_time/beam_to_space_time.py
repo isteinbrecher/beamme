@@ -307,11 +307,10 @@ def mesh_to_data_arrays(mesh: _Mesh):
     node_sets: _Dict[str, _Dict] = {}
     for value in geometry_sets.values():
         for geometry_set in value:
-            node_set_data = {
-                "node_ids": _np.array(
-                    [node.i_global for node in geometry_set.get_all_nodes()]
-                )
-            }
+            node_ids = sorted(
+                list(set(node.i_global for node in geometry_set.get_all_nodes()))
+            )
+            node_set_data = {"node_ids": node_ids}
             if geometry_set.name is not None:
                 node_set_data["name"] = geometry_set.name
             node_sets[str(len(node_sets) + 1)] = node_set_data
