@@ -41,6 +41,31 @@ class FourCElementData:
     four_c_cell: str
     element_technology: dict[str, _Any] = _field(default_factory=dict)
 
+    def get_block_dict(
+        self, i_block: int, i_material: int, additional_data: dict | None = None
+    ) -> dict:
+        """Return the dictionary containing the data for this element block.
+
+        Args:
+            i_block: The index of the element block.
+            i_material: The index of the material. If -1, no material will be assigned
+                to this element block.
+            additional_data: Additional data to add to the element block dictionary.
+
+        Returns: The dictionary to write this element block data to the input file for
+            mesh based output.
+        """
+        return {
+            "ID": i_block,
+            self.four_c_type: {
+                self.four_c_cell: {
+                    **({"MAT": i_material + 1} if i_material != -1 else {}),
+                    **self.element_technology,
+                    **(additional_data or {}),
+                }
+            },
+        }
+
     def get_legacy_dict(
         self, element_id, connectivity, element_material_id, additional_element_data
     ) -> dict:
