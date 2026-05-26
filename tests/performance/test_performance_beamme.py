@@ -174,6 +174,7 @@ def create_beam_mesh(n_x, n_y, n_z, n_el):
     return mesh
 
 
+@pytest.mark.cubitpy
 @pytest.mark.performance
 def test_performance_beamme_cubitpy_create_solid(
     evaluate_execution_time, shared_tmp_path

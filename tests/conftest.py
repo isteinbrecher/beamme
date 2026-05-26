@@ -132,9 +132,13 @@ def pytest_collection_modifyitems(config: Config, items: list) -> None:
         if not markers and not config.getoption("--exclude-standard-tests"):
             selected_tests.append(item)
 
-    deselected_tests = list(set(items) - set(selected_tests))
+    selected_tests_unique = list(
+        dict.fromkeys(selected_tests).keys()
+    )  # remove duplicates while preserving order
 
-    items[:] = selected_tests
+    deselected_tests = list(set(items) - set(selected_tests_unique))
+
+    items[:] = selected_tests_unique
     config.hook.pytest_deselected(items=deselected_tests)
 
 
