@@ -391,7 +391,7 @@ def test_integration_four_c_simulation_beam_and_solid_tube(
 
     # Call get_unique_geometry_sets to check that this does not affect the
     # mesh creation.
-    mesh.get_unique_geometry_sets(link_to_nodes="all_nodes")
+    mesh.get_unique_geometry_sets()
 
     # Add mesh to input file
     input_file.add(mesh)

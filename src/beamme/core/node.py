@@ -48,49 +48,24 @@ class Node:
 
         # Lists with the objects that this node is linked to.
         self.element_link = []
-        self.node_sets_link = []
-        self.mesh = None
 
         # If this node is replaced, store a link to the remaining node.
-        self.master_node = None
+        self.target_node = None
 
-    def get_master_node(self):
-        """Return the master node of this node.
+    def get_target_node(self):
+        """Return the target node of this node.
 
-        If the node has not been replaced, this object is returned.
+        If the node has not been replaced, this Node is returned.
         """
 
-        if self.master_node is None:
+        if self.target_node is None:
             return self
         else:
-            return self.master_node.get_master_node()
-
-    def replace_with(self, master_node):
-        """Replace this node with another node object."""
-
-        # Check that the two nodes have the same type.
-        if not isinstance(self, type(master_node)):
-            raise TypeError(
-                "A node can only be replaced by a node with the same type. "
-                + f"Got {type(self)} and {type(master_node)}"
-            )
-
-        # Replace the links to this node in the referenced objects.
-        self.mesh.replace_node(self, master_node)
-        for element in self.element_link:
-            element.replace_node(self, master_node)
-        for node_set in self.node_sets_link:
-            node_set.replace_node(self, master_node)
-
-        # Set link to master node.
-        self.master_node = master_node.get_master_node()
+            return self.target_node.get_target_node()
 
     def unlink(self):
-        """Reset the links to elements, node sets and global indices."""
+        """Reset the links to elements."""
         self.element_link = []
-        self.node_sets_link = []
-        self.mesh = None
-        self.i_global = None
 
     def rotate(self, *args, **kwargs):
         """Don't do anything for a standard node, as this node can not be

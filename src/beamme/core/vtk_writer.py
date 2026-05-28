@@ -73,8 +73,6 @@ def add_point_data_node_sets(point_data, nodes, *, extra_points=0):
 
     # Get list with node set indices of the given nodes
     geometry_set_list = []
-    for node in nodes:
-        geometry_set_list.extend(node.node_sets_link)
 
     # Remove double entries of list.
     geometry_set_list = list(dict.fromkeys(geometry_set_list))

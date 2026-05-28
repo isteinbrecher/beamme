@@ -53,52 +53,19 @@ class GeometrySetBase(_BaseMeshItem):
         self.geometry_type = geometry_type
         self.name = name
 
-    def link_to_nodes(
-        self, *, link_to_nodes: str = "explicitly_contained_nodes"
-    ) -> None:
-        """Set a link to this object in the all contained nodes of this
-        geometry set.
-
-        Args:
-            link_to_nodes:
-                "explicitly_contained_nodes":
-                    A link will be set for all nodes that are explicitly part of the geometry set
-                "all_nodes":
-                    A link will be set for all nodes that are part of the geometry set, i.e., also
-                    nodes connected to elements of an element set. This is mainly used for vtk
-                    output so we can color the nodes which are part of element sets.
-        """
-        node_list: list[_Node] | _KeysView[_Node]
-        if link_to_nodes == "explicitly_contained_nodes":
-            node_list = self.get_node_dict().keys()
-        elif link_to_nodes == "all_nodes":
-            node_list = self.get_all_nodes()
-        else:
-            raise ValueError(f'Got unexpected value link nodes="{link_to_nodes}"')
-        for node in node_list:
-            node.node_sets_link.append(self)
-
     def check_replaced_nodes(self) -> None:
         """Check if nodes in this set have to be replaced.
 
         We need to do this for explicitly contained nodes in this set.
         """
-        # Don't iterate directly over the keys as the dict changes during this iteration
-        for node in list(self.get_node_dict().keys()):
-            if node.master_node is not None:
-                self.replace_node(node, node.get_master_node())
-
-    def replace_node(self, old_node: _Node, new_node: _Node) -> None:
-        """Replace an existing node in this geometry set with a new one.
-
-        Args:
-            old_node: Node to be replaced.
-            new_node: Node that will be placed instead of old_node.
-        """
 
         explicit_nodes_in_this_set = self.get_node_dict()
-        explicit_nodes_in_this_set[new_node] = None
-        del explicit_nodes_in_this_set[old_node]
+        nodes_replaced = {
+            current_node.get_target_node(): None
+            for current_node in explicit_nodes_in_this_set.keys()
+        }
+        explicit_nodes_in_this_set.clear()
+        explicit_nodes_in_this_set.update(nodes_replaced)
 
     def get_node_dict(self) -> dict[_Node, None]:
         """Determine the explicitly added nodes for this set, i.e., nodes

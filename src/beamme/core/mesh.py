@@ -259,26 +259,45 @@ class Mesh:
                 for item in add_list:
                     self.add(item, **kwargs)
 
-    def replace_node(self, old_node, new_node):
-        """Replace the first node with the second node."""
+    def replace_nodes(self, replace_nodes: dict[_Node, _Node]) -> None:
+        """Replace all nodes in this mesh that are in the replacement map.
 
-        # Check that the new node is in mesh.
-        if new_node not in self.nodes:
-            raise ValueError("The new node is not in the mesh!")
+        Args:
+            replace_nodes: A dictionary that maps source nodes to target nodes. The
+                source nodes will be replaced with the target nodes in the mesh.
+        """
 
-        for i, node in enumerate(self.nodes):
-            if node == old_node:
-                del self.nodes[i]
-                break
-        else:
-            raise ValueError("The node that should be replaced is not in the mesh")
+        # Check that all source and target nodes are in the mesh.
+        for items, name in (
+            (replace_nodes.keys(), "source"),
+            (replace_nodes.values(), "target"),
+        ):
+            mesh_contains_all_nodes = set(items).issubset(self.nodes)
+            if not mesh_contains_all_nodes:
+                raise ValueError(f"Not all {name} nodes are in the mesh!")
+
+        # Remove source nodes from the mesh.
+        self.nodes = [node for node in self.nodes if node not in replace_nodes]
+
+        # Replace the nodes in the elements.
+        for element in self.elements:
+            for i, node in enumerate(element.nodes):
+                if node in replace_nodes:
+                    element.nodes[i] = replace_nodes[node]
+
+        # Set the links to the target nodes in the source nodes, so they can be
+        # replaced in the geometry sets.
+        for source_node, target_node in replace_nodes.items():
+            source_node.target_node = target_node
+
+        # Replace the nodes in the geometry sets.
+        mesh_sets = self.get_unique_geometry_sets()
+        for geometry_set_list in mesh_sets.values():
+            for geometry_set in geometry_set_list:
+                geometry_set.check_replaced_nodes()
 
     def get_unique_geometry_sets(
-        self,
-        *,
-        coupling_sets: bool = True,
-        # TODO: Check if we need all of the following options.
-        link_to_nodes: str = "no_link",
+        self, *, coupling_sets: bool = True
     ) -> _GeometrySetContainer:
         """Return a geometry set container that contains geometry sets
         explicitly added to the mesh, as well as sets for boundary conditions.
@@ -288,22 +307,7 @@ class Mesh:
         Args:
             coupling_sets:
                 If this is true, also sets for couplings will be added.
-            link_to_nodes:
-                "no_link":
-                    No link between the geometry set and the nodes is set
-                "explicitly_contained_nodes":
-                    A link will be set for all nodes that are explicitly part of the geometry set
-                "all_nodes":
-                    A link will be set for all nodes that are part of the geometry set, i.e., also
-                    nodes connected to elements of an element set. This is mainly used for vtk
-                    output so we can color the nodes which are part of element sets.
         """
-
-        is_link_nodes = not link_to_nodes == "no_link"
-        if is_link_nodes:
-            # First clear all links in existing nodes.
-            for node in self.nodes:
-                node.node_sets_link = []
 
         # Make a copy of the sets in this mesh.
         mesh_sets = self.geometry_sets.copy()
@@ -323,23 +327,13 @@ class Mesh:
                     if bc.geometry_set not in mesh_sets[geom_key]:
                         mesh_sets[geom_key].append(bc.geometry_set)
 
-        if is_link_nodes:
-            for key in mesh_sets.keys():
-                for geometry_set in mesh_sets[key]:
-                    geometry_set.link_to_nodes(link_to_nodes=link_to_nodes)
-
         return mesh_sets
 
     def set_node_links(self):
-        """Create a link of all elements to the nodes connected to them.
-
-        Also add a link to this mesh.
-        """
+        """Create a link of all elements to the nodes connected to them."""
         for element in self.elements:
             for node in element.nodes:
                 node.element_link.append(element)
-        for node in self.nodes:
-            node.mesh = self
 
     def translate(self, vector):
         """Translate all beam nodes of this mesh.
@@ -630,14 +624,8 @@ class Mesh:
             # Check if there are nodes with the same rotation. If there are the
             # nodes are reused, and no coupling is inserted.
 
-            # Set the links to all nodes in the mesh. In this case we have to use
-            # "all_nodes" since we also have to replace nodes that are in existing
-            # GeometrySetNodes.
-            self.unlink_nodes()
-            self.get_unique_geometry_sets(link_to_nodes="explicitly_contained_nodes")
-            self.set_node_links()
-
             # Go through partner nodes.
+            node_replacement_map: dict[_Node, _Node] = {}
             for node_list in partner_nodes:
                 # Get array with rotation vectors.
                 rotation_vectors = _np.zeros([len(node_list), 3])
@@ -698,14 +686,14 @@ class Mesh:
                             )
                         )
 
-                    # Replace the identical nodes.
+                    # Add to the replacement map.
                     for combine_list in combining_nodes:
-                        master_node = combine_list[0]
+                        target_node = combine_list[0]
                         for node in combine_list[1:]:
-                            node.replace_with(master_node)
+                            node_replacement_map[node] = target_node
 
-            # Remove the node links again.
-            self.unlink_nodes()
+            # Replace the nodes in the elements and geometry sets.
+            self.replace_nodes(node_replacement_map)
 
         else:
             # Connect close nodes with a coupling.
@@ -955,9 +943,7 @@ class Mesh:
         vtk_writer_solid = _VTKWriter()
 
         # Get the set numbers of the mesh
-        mesh_sets = self.get_unique_geometry_sets(
-            coupling_sets=coupling_sets, link_to_nodes="all_nodes"
-        )
+        mesh_sets = self.get_unique_geometry_sets(coupling_sets=coupling_sets)
 
         # Set the global value for digits in the VTK output.
         # Get highest number of node_sets.
