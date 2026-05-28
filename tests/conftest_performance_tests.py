@@ -23,32 +23,14 @@
 
 import time
 import warnings
-from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable
 
 import pytest
-
-from beamme.core.mesh import Mesh
-from beamme.four_c.input_file import InputFile
 
 PERFORMANCE_LOG = {}
 
 
 @pytest.fixture(scope="module")
-def cache_data():
-    """Fixture to cache data across tests."""
-
-    @dataclass
-    class PyTestCache:
-        """Cache for pytest data containing mesh and input file."""
-
-        mesh: Optional[Mesh] = None
-        input_file: Optional[InputFile] = None
-
-    return PyTestCache()
-
-
-@pytest.fixture(scope="function")
 def evaluate_execution_time() -> Callable:
     """Return function to evaluate execution time.
 

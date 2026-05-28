@@ -107,7 +107,7 @@ jobs:
       - name: Run the test suite and upload results on failure
         uses: ./.github/actions/run_tests
         with:
-          additional-pytest-flags: "--performance-tests --exclude-standard-tests -s --no-cov"
+          additional-pytest-flags: "--performance-tests --CubitPy --exclude-standard-tests -s --no-cov"
           cubit-root: ${{ steps.cubit.outputs.cubit_root }}
       - name: Free cubit license
         if: ${{ always() }}

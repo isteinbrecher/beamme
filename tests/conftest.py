@@ -110,31 +110,41 @@ def pytest_collection_modifyitems(config: Config, items: list) -> None:
         items: Pytest list of tests
     """
 
+    # Get all active markers for this pytest run
+    active_markers = set()
+    for flag, marker in zip(
+        ["--4C", "--ArborX", "--CubitPy", "--performance-tests"],
+        ["fourc", "arborx", "cubitpy", "performance"],
+    ):
+        if config.getoption(flag):
+            active_markers.add(marker)
+
     selected_tests = []
 
     # loop over all collected tests
     for item in items:
-        # Get all set markers for current test (e.g. `fourc_arborx`, `cubitpy`, `performance`, ...)
+        # Get all set markers for current test (e.g. `4C`, `ArborX`, `CubitPy`, ...)
         # We don't care about the "parametrize" marker here
-        markers = [
+        markers = set(
             marker.name
             for marker in item.iter_markers()
             if not marker.name == "parametrize"
-        ]
+        )
 
-        for flag, marker in zip(
-            ["--4C", "--ArborX", "--CubitPy", "--performance-tests"],
-            ["fourc", "arborx", "cubitpy", "performance"],
-        ):
-            if config.getoption(flag) and marker in markers:
+        if markers:
+            if markers.issubset(active_markers):
                 selected_tests.append(item)
 
-        if not markers and not config.getoption("--exclude-standard-tests"):
+        elif not config.getoption("--exclude-standard-tests"):
             selected_tests.append(item)
 
-    deselected_tests = list(set(items) - set(selected_tests))
+    selected_tests_unique = list(
+        dict.fromkeys(selected_tests).keys()
+    )  # remove duplicates while preserving order
 
-    items[:] = selected_tests
+    deselected_tests = list(set(items) - set(selected_tests_unique))
+
+    items[:] = selected_tests_unique
     config.hook.pytest_deselected(items=deselected_tests)
 
 

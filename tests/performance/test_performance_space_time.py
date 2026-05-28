@@ -30,11 +30,9 @@ from beamme.mesh_creation_functions.beam_line import create_beam_mesh_line
 from beamme.space_time.beam_to_space_time import beam_to_space_time
 
 
-@pytest.mark.performance
-def test_performance_space_time_create_mesh_in_space(
-    evaluate_execution_time, cache_data
-):
-    """Test the performance of the mesh creation in space."""
+@pytest.fixture(scope="module")
+def mesh_in_space(evaluate_execution_time):
+    """Provide mesh in space direction."""
 
     mesh = Mesh()
     beam_type = generate_beam_class(3)
@@ -53,13 +51,22 @@ def test_performance_space_time_create_mesh_in_space(
         expected_time=0.01,
     )
 
-    # store mesh in cache for upcoming test
-    cache_data.mesh = mesh
+    return mesh
+
+
+@pytest.mark.performance
+def test_performance_space_time_create_mesh_in_space(mesh_in_space):
+    """Test the performance of the mesh creation in space.
+
+    The test is run in the fixture, so we don't need to do anything
+    here.
+    """
+    pass
 
 
 @pytest.mark.performance
 def test_performance_space_time_create_mesh_in_time(
-    evaluate_execution_time, cache_data
+    mesh_in_space, evaluate_execution_time
 ):
     """Test the performance of the mesh creation in time."""
 
@@ -67,7 +74,7 @@ def test_performance_space_time_create_mesh_in_time(
         "BeamMe: Space-Time: Create mesh in time",
         beam_to_space_time,
         kwargs={
-            "mesh_space_or_generator": cache_data.mesh,
+            "mesh_space_or_generator": mesh_in_space,
             "time_duration": 6.9,
             "number_of_elements_in_time": 1000,
             "time_start": 1.69,
