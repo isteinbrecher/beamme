@@ -22,8 +22,6 @@
 """This module defines the classes that are used to create an input file for
 4C."""
 
-from __future__ import annotations as _annotations
-
 import os as _os
 from datetime import datetime as _datetime
 from pathlib import Path as _Path
@@ -54,7 +52,7 @@ if _cubitpy_is_available():
 class InputFile:
     """An item that represents a complete 4C input file."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the input file."""
 
         self.fourc_input = _FourCInput()
@@ -68,7 +66,7 @@ class InputFile:
 
         # Mesh representation for this input file.
         self.mesh_representation = _MeshRepresentation()
-        self.element_type_id_to_data = {}
+        self.element_type_id_to_data: dict[_Any, _Any] = {}
 
     def __contains__(self, key: str) -> bool:
         """Contains function.
@@ -111,7 +109,7 @@ class InputFile:
     @classmethod
     def from_4C_yaml(
         cls, input_file_path: str | _Path, header_only: bool = False
-    ) -> InputFile:
+    ) -> "InputFile":
         """Load 4C yaml file.
 
         Args:

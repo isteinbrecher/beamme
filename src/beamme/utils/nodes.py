@@ -21,8 +21,6 @@
 # THE SOFTWARE.
 """Helper functions to find, filter and interact with nodes."""
 
-from typing import Union as _Union
-
 import numpy as _np
 from numpy.typing import NDArray as _NDArray
 
@@ -120,7 +118,7 @@ def get_min_max_coordinates(nodes):
     return min_max
 
 
-def get_single_node(item: _Union[_Node, _GeometrySetBase]) -> _NodeCosserat:
+def get_single_node(item: _Node | _GeometrySetBase) -> _NodeCosserat:
     """Function to get a single node from the input item.
 
     Args:

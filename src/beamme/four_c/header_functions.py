@@ -24,7 +24,6 @@ an input file."""
 
 from typing import Any as _Any
 from typing import List as _List
-from typing import Union as _Union
 
 from beamme.core.conf import bme as _bme
 from beamme.four_c.input_file import InputFile as _InputFile
@@ -445,8 +444,8 @@ def set_header_static(
 
 def set_binning_strategy_section(
     input_file: _InputFile,
-    binning_bounding_box: _Union[_List[int], None] = None,
-    binning_cutoff_radius: _Union[float, None] = None,
+    binning_bounding_box: list[int] | None = None,
+    binning_cutoff_radius: float | None = None,
 ):
     """Set binning strategy in section of the input file.
 

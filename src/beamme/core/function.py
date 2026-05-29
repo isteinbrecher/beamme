@@ -27,7 +27,7 @@ from beamme.core.base_mesh_item import BaseMeshItem as _BaseMeshItem
 class Function(_BaseMeshItem):
     """Holds information for a function."""
 
-    def __init__(self, function_data):
+    def __init__(self, function_data) -> None:
         super().__init__(data=function_data)
 
         # Global index of this function in a mesh.
