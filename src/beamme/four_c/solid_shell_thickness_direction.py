@@ -197,12 +197,15 @@ def set_solid_shell_thickness_direction(
         raise ValueError("Expected a non empty element list")
 
     for element in elements:
+        four_c_data = getattr(type(element), "data", None)
+        if four_c_data is None:
+            raise ValueError(
+                "Expected element type to have a data attribute with the 4C element data!"
+            )
         is_hex8_solid_shell = (
-            getattr(type(element), "data", {})
-            .get("SOLID", {})
-            .get("HEX8", {})
-            .get("TECH", "")
-            == "shell_eas_ans"
+            four_c_data.four_c_type == "SOLID"
+            and four_c_data.four_c_cell == "HEX8"
+            and four_c_data.element_technology.get("TECH", "") == "shell_eas_ans"
         )
         if is_hex8_solid_shell:
             # Get the element center and the Jacobian at the center
