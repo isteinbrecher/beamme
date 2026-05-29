@@ -65,7 +65,7 @@ def extract_code_snippets(pytestconfig) -> tuple[dict[str, str], list[str]]:
     return snippets_named, snippets_unnamed
 
 
-def test_readme_auto(extract_code_snippets):
+def test_other_readme_auto(extract_code_snippets):
     """Run all unnamed code snippets from README automatically."""
     _, snippets_unnamed = extract_code_snippets
     for code in snippets_unnamed:
