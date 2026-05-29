@@ -23,6 +23,13 @@
 
 from typing import Any as _Any
 
+import numpy as _np
+from numpy.typing import NDArray as _NDArray
+
+from beamme.utils.data_structures import (
+    compare_nested_dicts_or_lists as _compare_nested_dicts_or_lists,
+)
+
 
 class FourCElementData:
     """Class that contains the data for a 4C element block."""
@@ -63,3 +70,47 @@ class FourCElementData:
                 **(additional_element_data or {}),
             },
         }
+
+    def __eq__(self, other) -> bool:
+        """Check if two 4C element data objects are equal."""
+        if self.four_c_cell != other.four_c_cell:
+            return False
+        if self.four_c_type != other.four_c_type:
+            return False
+        if not _compare_nested_dicts_or_lists(
+            self.element_technology, other.element_technology
+        ):
+            return False
+        return True
+
+
+def four_c_element_data_from_legacy_dict(
+    legacy_dict: dict,
+) -> tuple[FourCElementData, int, _NDArray, int]:
+    """Extract the 4C element data from a legacy element definition in the
+    input file.
+
+    Args:
+        legacy_dict: The legacy element definition in the input file.
+
+    Returns:
+        A tuple containing the 4C element data, the element ID, the connectivity, and the material ID.
+    """
+
+    element_id = legacy_dict["id"]
+    connectivity = _np.array(legacy_dict["cell"]["connectivity"], dtype=int) - 1
+    four_c_cell = legacy_dict["cell"]["type"]
+
+    # Since we directly store `legacy_dict["data"]` as the element technology data,
+    # the material ID and four_c_type have to be removed from the `legacy_dict["data"]`
+    # dictionary, thus the `pop`.
+    material_id = legacy_dict["data"].pop("MAT", -1)
+    four_c_type = legacy_dict["data"].pop("type")
+
+    data = FourCElementData(
+        four_c_type=four_c_type,
+        four_c_cell=four_c_cell,
+        element_technology=legacy_dict["data"],
+    )
+
+    return data, element_id, connectivity, material_id
