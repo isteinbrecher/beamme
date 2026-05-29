@@ -22,6 +22,7 @@
 """This module implements the class that represents one node in the Mesh."""
 
 import numpy as _np
+from numpy.typing import NDArray as _NDArray
 
 from beamme.core.conf import bme as _bme
 from beamme.core.rotation import Rotation as _Rotation
@@ -52,10 +53,12 @@ class Node:
         # If this node is replaced, store a link to the remaining node.
         self.target_node = None
 
-    def get_target_node(self):
+    def get_target_node(self) -> "Node":
         """Return the target node of this node.
 
-        If the node has not been replaced, this Node is returned.
+        Returns:
+            If this node has a linked target node, then this target node is returned,
+            otherwise this node is returned.
         """
 
         if self.target_node is None:
@@ -63,13 +66,9 @@ class Node:
         else:
             return self.target_node.get_target_node()
 
-    def unlink(self):
+    def unlink(self) -> None:
         """Reset the links to elements."""
         self.element_link = []
-
-    def rotate(self, *args, **kwargs):
-        """Don't do anything for a standard node, as this node can not be
-        rotated."""
 
 
 class NodeCosserat(Node):
@@ -94,13 +93,21 @@ class NodeCosserat(Node):
         # Arc length along the filament that this beam is a part of
         self.arc_length = arc_length
 
-    def rotate(self, rotation, *, origin=None, only_rotate_triads=False):
+    def rotate(
+        self,
+        rotation: _Rotation,
+        *,
+        origin: _NDArray | list[float] | None = None,
+        only_rotate_triads: bool = False,
+    ) -> None:
         """Rotate this node.
 
-        By default the node is rotated around the origin (0,0,0), if the
-        keyword argument origin is given, it is rotated around that
-        point. If only_rotate_triads is True, then only the rotation is
-        affected, the position of the node stays the same.
+        Args:
+            rotation: Rotation that will be applied to this node.
+            origin: Point around which the node will be rotated. If None, the
+                node will be rotated around the origin (0,0,0).
+            only_rotate_triads: If True, only the rotation of this node will be
+                affected, the position of the node stays the same.
         """
 
         self.rotation = rotation * self.rotation

@@ -267,6 +267,10 @@ class Mesh:
                 source nodes will be replaced with the target nodes in the mesh.
         """
 
+        # Nothing to do if the replacement map is empty.
+        if len(replace_nodes) == 0:
+            return
+
         # Check that all source and target nodes are in the mesh.
         for items, name in (
             (replace_nodes.keys(), "source"),
@@ -307,6 +311,9 @@ class Mesh:
         Args:
             coupling_sets:
                 If this is true, also sets for couplings will be added.
+
+        Returns:
+            A geometry set container that contains all geometry sets of this mesh.
         """
 
         # Make a copy of the sets in this mesh.
@@ -335,13 +342,11 @@ class Mesh:
             for node in element.nodes:
                 node.element_link.append(element)
 
-    def translate(self, vector):
+    def translate(self, vector: _NDArray | list[float]) -> None:
         """Translate all beam nodes of this mesh.
 
-        Args
-        ----
-        vector: _np.array, list
-            3D vector that will be added to all nodes.
+        Args:
+            vector: A 3D vector that will be added to all nodes.
         """
         for node in self.nodes:
             node.coordinates += vector
@@ -576,27 +581,26 @@ class Mesh:
         reuse_matching_nodes=False,
         coupling_type=_bme.bc.point_coupling,
         coupling_dof_type=_bme.coupling_dof.fix,
-    ):
+    ) -> None:
         """Search through nodes and connect all nodes with the same
         coordinates.
 
         Args:
-        ----
-        nodes: [Node]
-            List of nodes to couple. If None is given, all nodes of the mesh
-            are coupled (except middle nodes).
-        reuse_matching_nodes: bool
-            If two nodes have the same position and rotation, the nodes are
-            reduced to one node in the mesh. Be aware, that this might lead to
-            issues if not all DOFs of the nodes should be coupled.
-        coupling_type: bme.bc
-            Type of point coupling.
-        coupling_dof_type: str, bme.coupling_dof
-            str: The string that will be used in the input file.
-            bme.coupling_dof.fix: Fix all positional and rotational DOFs of the
-                nodes together.
-            bme.coupling_dof.joint: Fix all positional DOFs of the nodes
-                together.
+            nodes:
+                List of nodes to couple. If None is given, all nodes of the mesh
+                are coupled (except middle nodes).
+            reuse_matching_nodes:
+                If two nodes have the same position and rotation, the nodes are
+                reduced to one node in the mesh. Be aware, that this might lead to
+                issues if not all DOFs of the nodes should be coupled.
+            coupling_type:
+                Type of point coupling.
+            coupling_dof_type:
+                `str`: The string that will be used in the input file.
+                `bme.coupling_dof.fix`: Fix all positional and rotational DOFs of the
+                    nodes together.
+                `bme.coupling_dof.joint`: Fix all positional DOFs of the nodes
+                    together.
         """
 
         # Check that a coupling BC is given.
@@ -626,10 +630,10 @@ class Mesh:
 
             # Go through partner nodes.
             node_replacement_map: dict[_Node, _Node] = {}
-            for node_list in partner_nodes:
+            for partner_node_list in partner_nodes:
                 # Get array with rotation vectors.
-                rotation_vectors = _np.zeros([len(node_list), 3])
-                for i, node in enumerate(node_list):
+                rotation_vectors = _np.zeros([len(partner_node_list), 3])
+                for i, node in enumerate(partner_node_list):
                     if isinstance(node, _NodeCosserat):
                         rotation_vectors[i, :] = node.rotation.get_rotation_vector()
                     else:
@@ -646,13 +650,17 @@ class Mesh:
                 # Check if nodes with the same rotations were found.
                 if n_partners == 0:
                     self.add(
-                        _coupling_factory(node_list, coupling_type, coupling_dof_type)
+                        _coupling_factory(
+                            partner_node_list, coupling_type, coupling_dof_type
+                        )
                     )
                 else:
                     # There are nodes that need to be combined.
-                    combining_nodes = []
-                    coupling_nodes = []
-                    found_partner_id = [None for _i in range(n_partners)]
+                    combining_nodes: list[list[_Node]] = []
+                    coupling_nodes: list[_Node] = []
+                    found_partner_id: list[int | None] = [
+                        None for _i in range(n_partners)
+                    ]
 
                     # Add the nodes that need to be combined and add the nodes
                     # that will be coupled.
@@ -660,13 +668,13 @@ class Mesh:
                         if partner == -1:
                             # This node does not have a partner with the same
                             # rotation.
-                            coupling_nodes.append(node_list[i])
+                            coupling_nodes.append(partner_node_list[i])
 
                         elif found_partner_id[partner] is not None:
                             # This node has already a processed partner, add
                             # this one to the combining nodes.
                             combining_nodes[found_partner_id[partner]].append(
-                                node_list[i]
+                                partner_node_list[i]
                             )
 
                         else:
@@ -675,8 +683,8 @@ class Mesh:
                             # be replaced with this one.
                             new_index = len(combining_nodes)
                             found_partner_id[partner] = new_index
-                            combining_nodes.append([node_list[i]])
-                            coupling_nodes.append(node_list[i])
+                            combining_nodes.append([partner_node_list[i]])
+                            coupling_nodes.append(partner_node_list[i])
 
                     # Add the coupling nodes.
                     if len(coupling_nodes) > 1:

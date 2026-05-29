@@ -40,20 +40,15 @@ from beamme.geometric_search.find_close_points import (
 )
 
 
-def find_close_nodes(nodes, **kwargs):
+def find_close_nodes(nodes: list[_Node], **kwargs) -> list[list[_Node]]:
     """Find nodes in a point cloud that are within a certain tolerance of each
     other.
 
-    Args
-    ----
-    nodes: list(Node)
-        Nodes who are part of the point cloud.
-    **kwargs:
-        Arguments passed on to geometric_search.find_close_points
+    Args:
+        nodes: Nodes who are part of the point cloud.
+        **kwargs: Arguments passed on to geometric_search.find_close_points
 
-    Return
-    ----
-    partner_nodes: list(list(Node))
+    Returns:
         A list of lists of nodes that are close to each other, i.e.,
         each element in the returned list contains nodes that are close
         to each other.
@@ -150,7 +145,7 @@ def get_single_node(item: _Union[_Node, _GeometrySetBase]) -> _NodeCosserat:
     return node
 
 
-def filter_nodes(nodes, *, middle_nodes=True):
+def filter_nodes(nodes, *, middle_nodes=True) -> list[_Node]:
     """Filter the list of the given nodes. Be aware that if no filters are
     enabled the original list will be returned.
 
