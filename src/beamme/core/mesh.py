@@ -259,26 +259,49 @@ class Mesh:
                 for item in add_list:
                     self.add(item, **kwargs)
 
-    def replace_node(self, old_node, new_node):
-        """Replace the first node with the second node."""
+    def replace_nodes(self, replace_nodes: dict[_Node, _Node]) -> None:
+        """Replace all nodes in this mesh that are in the replacement map.
 
-        # Check that the new node is in mesh.
-        if new_node not in self.nodes:
-            raise ValueError("The new node is not in the mesh!")
+        Args:
+            replace_nodes: A dictionary that maps source nodes to target nodes. The
+                source nodes will be replaced with the target nodes in the mesh.
+        """
 
-        for i, node in enumerate(self.nodes):
-            if node == old_node:
-                del self.nodes[i]
-                break
-        else:
-            raise ValueError("The node that should be replaced is not in the mesh")
+        # Nothing to do if the replacement map is empty.
+        if len(replace_nodes) == 0:
+            return
+
+        # Check that all source and target nodes are in the mesh.
+        for items, name in (
+            (replace_nodes.keys(), "source"),
+            (replace_nodes.values(), "target"),
+        ):
+            mesh_contains_all_nodes = set(items).issubset(self.nodes)
+            if not mesh_contains_all_nodes:
+                raise ValueError(f"Not all {name} nodes are in the mesh!")
+
+        # Remove source nodes from the mesh.
+        self.nodes = [node for node in self.nodes if node not in replace_nodes]
+
+        # Replace the nodes in the elements.
+        for element in self.elements:
+            for i, node in enumerate(element.nodes):
+                if node in replace_nodes:
+                    element.nodes[i] = replace_nodes[node]
+
+        # Set the links to the target nodes in the source nodes, so they can be
+        # replaced in the geometry sets.
+        for source_node, target_node in replace_nodes.items():
+            source_node.target_node = target_node
+
+        # Replace the nodes in the geometry sets.
+        mesh_sets = self.get_unique_geometry_sets()
+        for geometry_set_list in mesh_sets.values():
+            for geometry_set in geometry_set_list:
+                geometry_set.check_replaced_nodes()
 
     def get_unique_geometry_sets(
-        self,
-        *,
-        coupling_sets: bool = True,
-        # TODO: Check if we need all of the following options.
-        link_to_nodes: str = "no_link",
+        self, *, coupling_sets: bool = True
     ) -> _GeometrySetContainer:
         """Return a geometry set container that contains geometry sets
         explicitly added to the mesh, as well as sets for boundary conditions.
@@ -288,22 +311,10 @@ class Mesh:
         Args:
             coupling_sets:
                 If this is true, also sets for couplings will be added.
-            link_to_nodes:
-                "no_link":
-                    No link between the geometry set and the nodes is set
-                "explicitly_contained_nodes":
-                    A link will be set for all nodes that are explicitly part of the geometry set
-                "all_nodes":
-                    A link will be set for all nodes that are part of the geometry set, i.e., also
-                    nodes connected to elements of an element set. This is mainly used for vtk
-                    output so we can color the nodes which are part of element sets.
-        """
 
-        is_link_nodes = not link_to_nodes == "no_link"
-        if is_link_nodes:
-            # First clear all links in existing nodes.
-            for node in self.nodes:
-                node.node_sets_link = []
+        Returns:
+            A geometry set container that contains all geometry sets of this mesh.
+        """
 
         # Make a copy of the sets in this mesh.
         mesh_sets = self.geometry_sets.copy()
@@ -323,31 +334,19 @@ class Mesh:
                     if bc.geometry_set not in mesh_sets[geom_key]:
                         mesh_sets[geom_key].append(bc.geometry_set)
 
-        if is_link_nodes:
-            for key in mesh_sets.keys():
-                for geometry_set in mesh_sets[key]:
-                    geometry_set.link_to_nodes(link_to_nodes=link_to_nodes)
-
         return mesh_sets
 
     def set_node_links(self):
-        """Create a link of all elements to the nodes connected to them.
-
-        Also add a link to this mesh.
-        """
+        """Create a link of all elements to the nodes connected to them."""
         for element in self.elements:
             for node in element.nodes:
                 node.element_link.append(element)
-        for node in self.nodes:
-            node.mesh = self
 
-    def translate(self, vector):
+    def translate(self, vector: _NDArray | list[float]) -> None:
         """Translate all beam nodes of this mesh.
 
-        Args
-        ----
-        vector: _np.array, list
-            3D vector that will be added to all nodes.
+        Args:
+            vector: A 3D vector that will be added to all nodes.
         """
         for node in self.nodes:
             node.coordinates += vector
@@ -582,27 +581,26 @@ class Mesh:
         reuse_matching_nodes=False,
         coupling_type=_bme.bc.point_coupling,
         coupling_dof_type=_bme.coupling_dof.fix,
-    ):
+    ) -> None:
         """Search through nodes and connect all nodes with the same
         coordinates.
 
         Args:
-        ----
-        nodes: [Node]
-            List of nodes to couple. If None is given, all nodes of the mesh
-            are coupled (except middle nodes).
-        reuse_matching_nodes: bool
-            If two nodes have the same position and rotation, the nodes are
-            reduced to one node in the mesh. Be aware, that this might lead to
-            issues if not all DOFs of the nodes should be coupled.
-        coupling_type: bme.bc
-            Type of point coupling.
-        coupling_dof_type: str, bme.coupling_dof
-            str: The string that will be used in the input file.
-            bme.coupling_dof.fix: Fix all positional and rotational DOFs of the
-                nodes together.
-            bme.coupling_dof.joint: Fix all positional DOFs of the nodes
-                together.
+            nodes:
+                List of nodes to couple. If None is given, all nodes of the mesh
+                are coupled (except middle nodes).
+            reuse_matching_nodes:
+                If two nodes have the same position and rotation, the nodes are
+                reduced to one node in the mesh. Be aware, that this might lead to
+                issues if not all DOFs of the nodes should be coupled.
+            coupling_type:
+                Type of point coupling.
+            coupling_dof_type:
+                `str`: The string that will be used in the input file.
+                `bme.coupling_dof.fix`: Fix all positional and rotational DOFs of the
+                    nodes together.
+                `bme.coupling_dof.joint`: Fix all positional DOFs of the nodes
+                    together.
         """
 
         # Check that a coupling BC is given.
@@ -630,18 +628,12 @@ class Mesh:
             # Check if there are nodes with the same rotation. If there are the
             # nodes are reused, and no coupling is inserted.
 
-            # Set the links to all nodes in the mesh. In this case we have to use
-            # "all_nodes" since we also have to replace nodes that are in existing
-            # GeometrySetNodes.
-            self.unlink_nodes()
-            self.get_unique_geometry_sets(link_to_nodes="explicitly_contained_nodes")
-            self.set_node_links()
-
             # Go through partner nodes.
-            for node_list in partner_nodes:
+            node_replacement_map: dict[_Node, _Node] = {}
+            for partner_node_list in partner_nodes:
                 # Get array with rotation vectors.
-                rotation_vectors = _np.zeros([len(node_list), 3])
-                for i, node in enumerate(node_list):
+                rotation_vectors = _np.zeros([len(partner_node_list), 3])
+                for i, node in enumerate(partner_node_list):
                     if isinstance(node, _NodeCosserat):
                         rotation_vectors[i, :] = node.rotation.get_rotation_vector()
                     else:
@@ -658,13 +650,17 @@ class Mesh:
                 # Check if nodes with the same rotations were found.
                 if n_partners == 0:
                     self.add(
-                        _coupling_factory(node_list, coupling_type, coupling_dof_type)
+                        _coupling_factory(
+                            partner_node_list, coupling_type, coupling_dof_type
+                        )
                     )
                 else:
                     # There are nodes that need to be combined.
-                    combining_nodes = []
-                    coupling_nodes = []
-                    found_partner_id = [None for _i in range(n_partners)]
+                    combining_nodes: list[list[_Node]] = []
+                    coupling_nodes: list[_Node] = []
+                    found_partner_id: list[int | None] = [
+                        None for _i in range(n_partners)
+                    ]
 
                     # Add the nodes that need to be combined and add the nodes
                     # that will be coupled.
@@ -672,13 +668,13 @@ class Mesh:
                         if partner == -1:
                             # This node does not have a partner with the same
                             # rotation.
-                            coupling_nodes.append(node_list[i])
+                            coupling_nodes.append(partner_node_list[i])
 
                         elif found_partner_id[partner] is not None:
                             # This node has already a processed partner, add
                             # this one to the combining nodes.
                             combining_nodes[found_partner_id[partner]].append(
-                                node_list[i]
+                                partner_node_list[i]
                             )
 
                         else:
@@ -687,8 +683,8 @@ class Mesh:
                             # be replaced with this one.
                             new_index = len(combining_nodes)
                             found_partner_id[partner] = new_index
-                            combining_nodes.append([node_list[i]])
-                            coupling_nodes.append(node_list[i])
+                            combining_nodes.append([partner_node_list[i]])
+                            coupling_nodes.append(partner_node_list[i])
 
                     # Add the coupling nodes.
                     if len(coupling_nodes) > 1:
@@ -698,14 +694,14 @@ class Mesh:
                             )
                         )
 
-                    # Replace the identical nodes.
+                    # Add to the replacement map.
                     for combine_list in combining_nodes:
-                        master_node = combine_list[0]
+                        target_node = combine_list[0]
                         for node in combine_list[1:]:
-                            node.replace_with(master_node)
+                            node_replacement_map[node] = target_node
 
-            # Remove the node links again.
-            self.unlink_nodes()
+            # Replace the nodes in the elements and geometry sets.
+            self.replace_nodes(node_replacement_map)
 
         else:
             # Connect close nodes with a coupling.
@@ -955,9 +951,7 @@ class Mesh:
         vtk_writer_solid = _VTKWriter()
 
         # Get the set numbers of the mesh
-        mesh_sets = self.get_unique_geometry_sets(
-            coupling_sets=coupling_sets, link_to_nodes="all_nodes"
-        )
+        mesh_sets = self.get_unique_geometry_sets(coupling_sets=coupling_sets)
 
         # Set the global value for digits in the VTK output.
         # Get highest number of node_sets.

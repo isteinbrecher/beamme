@@ -298,6 +298,32 @@ def test_performance_beamme_create_beams(large_beam_mesh):
 
 
 @pytest.mark.performance
+def test_performance_beamme_copy_beams(large_beam_mesh, evaluate_execution_time):
+    """Test the performance of copying a large beam mesh."""
+
+    evaluate_execution_time(
+        "BeamMe: Copy large beam mesh",
+        large_beam_mesh.copy,
+        kwargs={},
+        expected_time=7.0,
+    )
+
+
+@pytest.mark.performance
+def test_performance_beamme_add_beams_to_mesh(large_beam_mesh, evaluate_execution_time):
+    """Test the performance of adding a large beam mesh to another."""
+
+    # To avoid modifying the original mesh, we make a copy and add to that.
+    large_beam_mesh_copy = large_beam_mesh.copy()
+    evaluate_execution_time(
+        "BeamMe: Add large beam mesh to another",
+        large_beam_mesh_copy.add,
+        args=[large_beam_mesh],
+        expected_time=0.1,
+    )
+
+
+@pytest.mark.performance
 def test_performance_beamme_rotate(large_beam_mesh, evaluate_execution_time):
     """Test the performance of rotating a large beam mesh."""
 
@@ -383,6 +409,26 @@ def test_performance_beamme_find_close_nodes(large_beam_mesh, evaluate_execution
         find_close_nodes,
         kwargs={"nodes": large_beam_mesh.nodes},
         expected_time=0.4,
+    )
+
+
+@pytest.mark.performance
+def test_performance_beamme_couple_nodes(large_beam_mesh, evaluate_execution_time):
+    """Test the performance of coupling nodes in a large beam mesh.
+
+    We add the mesh to itself, to have matching nodes to replace.
+    """
+
+    # To avoid modifying the original mesh, we make a copies and add them to each
+    # other.
+    large_beam_mesh_copy_1 = large_beam_mesh.copy()
+    large_beam_mesh_copy_2 = large_beam_mesh.copy()
+    large_beam_mesh_copy_1.add(large_beam_mesh_copy_2)
+    evaluate_execution_time(
+        "BeamMe: Couple nodes in large beam mesh",
+        large_beam_mesh_copy_1.couple_nodes,
+        kwargs={"reuse_matching_nodes": True},
+        expected_time=7.0,
     )
 
 

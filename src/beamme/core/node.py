@@ -24,6 +24,7 @@
 from typing import Any as _Any
 
 import numpy as _np
+from numpy.typing import NDArray as _NDArray
 
 from beamme.core.conf import bme as _bme
 from beamme.core.rotation import Rotation as _Rotation
@@ -50,53 +51,26 @@ class Node:
 
         # Lists with the objects that this node is linked to.
         self.element_link: list[_Any] = []
-        self.node_sets_link: list[_Any] = []
-        self.mesh = None
 
         # If this node is replaced, store a link to the remaining node.
-        self.master_node = None
+        self.target_node: "Node" | None = None
 
-    def get_master_node(self):
-        """Return the master node of this node.
+    def get_target_node(self) -> "Node":
+        """Return the target node of this node.
 
-        If the node has not been replaced, this object is returned.
+        Returns:
+            If this node has a linked target node, then this target node is returned,
+            otherwise this node is returned.
         """
 
-        if self.master_node is None:
+        if self.target_node is None:
             return self
         else:
-            return self.master_node.get_master_node()
+            return self.target_node.get_target_node()
 
-    def replace_with(self, master_node):
-        """Replace this node with another node object."""
-
-        # Check that the two nodes have the same type.
-        if not isinstance(self, type(master_node)):
-            raise TypeError(
-                "A node can only be replaced by a node with the same type. "
-                + f"Got {type(self)} and {type(master_node)}"
-            )
-
-        # Replace the links to this node in the referenced objects.
-        self.mesh.replace_node(self, master_node)
-        for element in self.element_link:
-            element.replace_node(self, master_node)
-        for node_set in self.node_sets_link:
-            node_set.replace_node(self, master_node)
-
-        # Set link to master node.
-        self.master_node = master_node.get_master_node()
-
-    def unlink(self):
-        """Reset the links to elements, node sets and global indices."""
+    def unlink(self) -> None:
+        """Reset the links to elements."""
         self.element_link = []
-        self.node_sets_link = []
-        self.mesh = None
-        self.i_global = None
-
-    def rotate(self, *args, **kwargs):
-        """Don't do anything for a standard node, as this node can not be
-        rotated."""
 
 
 class NodeCosserat(Node):
@@ -121,13 +95,21 @@ class NodeCosserat(Node):
         # Arc length along the filament that this beam is a part of
         self.arc_length = arc_length
 
-    def rotate(self, rotation, *, origin=None, only_rotate_triads=False):
+    def rotate(
+        self,
+        rotation: _Rotation,
+        *,
+        origin: _NDArray | list[float] | None = None,
+        only_rotate_triads: bool = False,
+    ) -> None:
         """Rotate this node.
 
-        By default the node is rotated around the origin (0,0,0), if the
-        keyword argument origin is given, it is rotated around that
-        point. If only_rotate_triads is True, then only the rotation is
-        affected, the position of the node stays the same.
+        Args:
+            rotation: Rotation that will be applied to this node.
+            origin: Point around which the node will be rotated. If None, the
+                node will be rotated around the origin (0,0,0).
+            only_rotate_triads: If True, only the rotation of this node will be
+                affected, the position of the node stays the same.
         """
 
         self.rotation = rotation * self.rotation

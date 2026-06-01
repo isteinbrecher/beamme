@@ -38,6 +38,9 @@ from beamme.core.node import NodeCosserat
 from beamme.core.rotation import Rotation
 from beamme.four_c.element_beam import Beam3rHerm2Line3
 from beamme.four_c.model_importer import import_four_c_model
+from beamme.mesh_creation_functions.beam_arc import (
+    create_beam_mesh_arc_segment_2d,
+)
 from beamme.mesh_creation_functions.beam_line import create_beam_mesh_line
 from tests.create_test_models import create_beam_to_solid_conditions_model
 
@@ -229,6 +232,54 @@ def test_integration_core_mesh_reflection(
         ),
         mesh,
     )
+
+
+def test_integration_core_mesh_couple_nodes(
+    get_default_test_beam_material,
+    get_corresponding_reference_file_path,
+    assert_results_close,
+):
+    """Test the couple nodes functionality when replacing nodes."""
+
+    mesh = Mesh()
+    mat = get_default_test_beam_material(material_type="reissner")
+
+    # Create the beam structure
+    beam_set_1 = create_beam_mesh_line(
+        mesh, Beam3rHerm2Line3, mat, [0, 10, 0], [0, 0, 0], n_el=2
+    )
+    beam_set_2 = create_beam_mesh_line(
+        mesh, Beam3rHerm2Line3, mat, [0, 0, 0], [10, 0, 0], n_el=2
+    )
+    beam_set_3 = create_beam_mesh_line(
+        mesh, Beam3rHerm2Line3, mat, [10, 0, 0], [20, 0, 0], n_el=2
+    )
+    beam_set_4 = create_beam_mesh_line(
+        mesh, Beam3rHerm2Line3, mat, [20, 0, 0], [30, 0, 0], n_el=2
+    )
+
+    def create_arc():
+        """Create an arc that starts at the end position of beam set 3."""
+        mesh_arc = Mesh()
+        arc_set = create_beam_mesh_arc_segment_2d(
+            mesh_arc, Beam3rHerm2Line3, mat, [20, 20, 0], 20, -np.pi * 0.5, 0.0, n_el=2
+        )
+        return mesh_arc, arc_set
+
+    arc_mesh, beam_set_5 = create_arc()
+    mesh.add(arc_mesh)
+
+    arc_mesh, beam_set_6 = create_arc()
+    arc_mesh.rotate(Rotation([1, 0, 0], 0.5 * np.pi), origin=[20, 0, 0])
+    mesh.add(arc_mesh)
+
+    # Add all created sets to the mesh.
+    mesh.add(beam_set_1, beam_set_2, beam_set_3, beam_set_4, beam_set_5, beam_set_6)
+
+    # Couple the nodes and replace equal nodes.
+    mesh.couple_nodes(reuse_matching_nodes=True)
+
+    assert_results_close(get_corresponding_reference_file_path(), mesh)
 
 
 @pytest.mark.parametrize(
