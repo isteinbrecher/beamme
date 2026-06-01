@@ -28,7 +28,7 @@ RUN apt-get update
 RUN apt-get install -y git
 RUN apt-get install -y build-essential
 RUN apt-get install -y ffmpeg libsm6 libxext6
-RUN apt-get install -y libgl1-mesa-glx xvfb
+RUN apt-get install -y libgl1 xvfb
 
 COPY . ${HOME}
 USER root
