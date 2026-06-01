@@ -53,7 +53,7 @@ class Node:
         self.element_link: list[_Any] = []
 
         # If this node is replaced, store a link to the remaining node.
-        self.target_node = None
+        self.target_node: "Node" | None = None
 
     def get_target_node(self) -> "Node":
         """Return the target node of this node.
