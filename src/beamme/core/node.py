@@ -21,6 +21,8 @@
 # THE SOFTWARE.
 """This module implements the class that represents one node in the Mesh."""
 
+from typing import Any as _Any
+
 import numpy as _np
 from numpy.typing import NDArray as _NDArray
 
@@ -33,7 +35,7 @@ class Node:
 
     node_type = _bme.node_type.node
 
-    def __init__(self, coordinates, *, is_middle_node=False):
+    def __init__(self, coordinates, *, is_middle_node=False) -> None:
         # Global index of this node in a mesh.
         self.i_global: None | int = None
 
@@ -48,7 +50,7 @@ class Node:
         self.is_middle_node = is_middle_node
 
         # Lists with the objects that this node is linked to.
-        self.element_link = []
+        self.element_link: list[_Any] = []
 
         # If this node is replaced, store a link to the remaining node.
         self.target_node = None

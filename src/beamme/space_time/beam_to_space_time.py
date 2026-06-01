@@ -26,7 +26,6 @@ from typing import Dict as _Dict
 from typing import List as _List
 from typing import Tuple as _Tuple
 from typing import Type as _Type
-from typing import Union as _Union
 from typing import cast as _cast
 
 import numpy as _np
@@ -84,7 +83,7 @@ class SpaceTimeElementQuad9(SpaceTimeElement):
 
 
 def beam_to_space_time(
-    mesh_space_or_generator: _Union[_Mesh, _Callable[[float], _Mesh]],
+    mesh_space_or_generator: _Mesh | _Callable[[float], _Mesh],
     time_duration: float,
     number_of_elements_in_time: int,
     *,
@@ -131,9 +130,8 @@ def beam_to_space_time(
     # Calculate global mesh properties
     number_of_nodes_in_space = len(mesh_space_reference.nodes)
     number_of_elements_in_space = len(mesh_space_reference.elements)
-    space_time_element_type: _Union[
-        _Type[SpaceTimeElementQuad4], _Type[SpaceTimeElementQuad9]
-    ]
+    space_time_element_type: _Type[SpaceTimeElementQuad4] | _Type[SpaceTimeElementQuad9]
+
     if len(element_type.nodes_create) == 2:
         number_of_copies_in_time = number_of_elements_in_time + 1
         time_increment_between_nodes = time_duration / number_of_elements_in_time

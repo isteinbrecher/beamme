@@ -22,8 +22,6 @@
 """This function converts the DBC monitor log files to Neumann boundary
 conditions in a mesh."""
 
-from typing import Optional as _Optional
-
 import numpy as _np
 import yaml as _yaml
 
@@ -197,7 +195,7 @@ def dbc_monitor_to_mesh_all_values(
     *,
     steps: list[int] = [],
     time_span: list[int] = [0, 1, 2],
-    type: _Optional[str] = "linear",
+    type: str | None = "linear",
     flip_time_values: bool = False,
     functions: list[_Function] = [],
     **kwargs,

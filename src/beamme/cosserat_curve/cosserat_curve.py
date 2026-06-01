@@ -23,7 +23,6 @@
 curve-like objects."""
 
 from pathlib import Path as _Path
-from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 from xml.etree import ElementTree as _ET  # nosec B405
 
@@ -172,7 +171,7 @@ class CosseratCurve(object):
         self,
         point_coordinates: _np.ndarray,
         *,
-        starting_triad_guess: _Optional[_Rotation] = None,
+        starting_triad_guess: _Rotation | None = None,
     ):
         """Initialize the Cosserat curve based on points in 3D space.
 

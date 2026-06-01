@@ -27,7 +27,6 @@ import subprocess as _subprocess  # nosec B404
 import sys as _sys
 from importlib.util import find_spec as _find_spec
 from pathlib import Path as _Path
-from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 
 
@@ -72,7 +71,7 @@ def get_env_variable(name, *, default="default_not_set"):
     return default
 
 
-def get_git_data(repo_path: _Path) -> _Tuple[_Optional[str], _Optional[str]]:
+def get_git_data(repo_path: _Path) -> _Tuple[str | None, str | None]:
     """Return the hash and date of the current git commit of a git repo for a
     given repo path.
 
