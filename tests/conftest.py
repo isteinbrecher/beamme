@@ -93,7 +93,7 @@ def pytest_addoption(parser: Parser) -> None:
     )
 
 
-def _check_test_naming_convention(item) -> None:
+def _check_naming_convention(item) -> None:
     """Check that the test name aligns with the naming conventions, i.e., the
     test file name has to be named according to the directory structure and the
     test name must start with the test file name."""
@@ -152,7 +152,7 @@ def pytest_collection_modifyitems(config: Config, items: list) -> None:
 
     # loop over all collected tests
     for item in items:
-        _check_test_naming_convention(item)
+        _check_naming_convention(item)
 
         # Get all set markers for current test (e.g. `4C`, `ArborX`, `CubitPy`, ...)
         # We don't care about the "parametrize" marker here
