@@ -93,8 +93,37 @@ def pytest_addoption(parser: Parser) -> None:
     )
 
 
+def _check_test_naming_convention(item) -> None:
+    """Check that the test name aligns with the naming conventions, i.e., the
+    test file name has to be named according to the directory structure and the
+    test name must start with the test file name."""
+
+    test_name = item.name
+
+    testing_root = Path(__file__).parent
+    test_file = Path(item.path)
+    test_file_name = test_file.stem
+    test_file_dir = test_file.parent
+    subdir_list = list(test_file_dir.relative_to(testing_root).parts)
+
+    prefix_from_subdirs = "_".join(["test"] + subdir_list)
+    if not test_file_name.startswith(prefix_from_subdirs):
+        raise ValueError(
+            f"The test file {item.path} does not follow our naming convention. "
+            f"Expected to start with {prefix_from_subdirs}"
+        )
+
+    if not test_name.startswith(test_file_name):
+        raise ValueError(
+            f"The test {item.path}::{test_name} does not follow our naming convention."
+            f" Expected to start with {test_file_name}"
+        )
+
+
 def pytest_collection_modifyitems(config: Config, items: list) -> None:
     """Filter tests based on their markers and provided command line options.
+
+    Additionally, check that the tests align with our naming convention.
 
     Currently configured options:
         `pytest`: Execute standard tests with no markers
@@ -123,6 +152,8 @@ def pytest_collection_modifyitems(config: Config, items: list) -> None:
 
     # loop over all collected tests
     for item in items:
+        _check_test_naming_convention(item)
+
         # Get all set markers for current test (e.g. `4C`, `ArborX`, `CubitPy`, ...)
         # We don't care about the "parametrize" marker here
         markers = set(

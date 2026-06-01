@@ -25,7 +25,7 @@ from beamme.core.mesh import Mesh
 from beamme.four_c.input_file import InputFile
 
 
-def test_integration_four_c_sub_materials(
+def test_integration_four_c_material_sub_materials(
     get_default_test_solid_material,
     get_corresponding_reference_file_path,
     assert_results_close,
@@ -43,7 +43,7 @@ def test_integration_four_c_sub_materials(
     assert_results_close(get_corresponding_reference_file_path(), mesh)
 
 
-def test_integration_four_c_sub_materials_material_numbering(
+def test_integration_four_c_material_sub_materials_material_numbering(
     get_default_test_beam_material,
     assert_results_close,
     get_corresponding_reference_file_path,
