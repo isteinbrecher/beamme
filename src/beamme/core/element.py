@@ -21,11 +21,15 @@
 # THE SOFTWARE.
 """This module implements the class that represents one element in the Mesh."""
 
+from typing import Any as _Any
+
+from beamme.core.material import Material as _Material
+
 
 class Element:
     """A base class for an FEM element in the mesh."""
 
-    def __init__(self, nodes=None, material=None):
+    def __init__(self, nodes=None, material: _Material | None = None) -> None:
         # Global index of this element in a mesh.
         self.i_global: None | int = None
 
@@ -39,7 +43,7 @@ class Element:
         self.material = material
 
         # VTK cell data for this element.
-        self.vtk_cell_data = {}
+        self.vtk_cell_data: _Any = {}
 
     def flip(self):
         """Reverse the nodes of this element.

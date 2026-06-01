@@ -27,7 +27,6 @@ import ast as _ast
 import sys as _sys
 from dataclasses import dataclass as _dataclass
 from pathlib import Path as _Path
-from typing import Optional as _Optional
 
 
 @_dataclass
@@ -36,8 +35,8 @@ class Error:
 
     filename: str
     message: str
-    line_nr: _Optional[int] = None
-    column_nr: _Optional[int] = None
+    line_nr: int | None = None
+    column_nr: int | None = None
 
 
 class ImportChecker(_ast.NodeVisitor):

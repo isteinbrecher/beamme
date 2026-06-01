@@ -23,8 +23,6 @@
 
 import warnings as _warnings
 from typing import Dict as _Dict
-from typing import Optional as _Optional
-from typing import Union as _Union
 
 import beamme.core.conf as _conf
 from beamme.core.base_mesh_item import BaseMeshItem as _BaseMeshItem
@@ -41,7 +39,7 @@ class BoundaryConditionBase(_BaseMeshItem):
     def __init__(
         self,
         geometry_set: _GeometrySetBase,
-        bc_type: _Union[_conf.BoundaryCondition, str],
+        bc_type: _conf.BoundaryCondition | str,
         **kwargs,
     ):
         """Initialize the boundary condition.
@@ -64,9 +62,9 @@ class BoundaryCondition(BoundaryConditionBase):
         self,
         geometry_set: _GeometrySetBase,
         data: _Dict,
-        bc_type: _Union[_conf.BoundaryCondition, str],
+        bc_type: _conf.BoundaryCondition | str,
         *,
-        double_nodes: _Optional[_conf.DoubleNodes] = None,
+        double_nodes: _conf.DoubleNodes | None = None,
         **kwargs,
     ):
         """Initialize the object.

@@ -24,7 +24,6 @@ file."""
 
 from typing import KeysView as _KeysView
 from typing import Sequence as _Sequence
-from typing import Union as _Union
 from typing import cast as _cast
 
 import beamme.core.conf as _conf
@@ -300,7 +299,7 @@ class GeometrySetNodes(GeometrySetBase):
     def __init__(
         self,
         geometry_type: _conf.Geometry,
-        nodes: _Union[_Node, list[_Node], "GeometrySetNodes", None] = None,
+        nodes: "_Node | list[_Node] | GeometrySetNodes | None" = None,
         **kwargs,
     ):
         """Initialize the geometry set.
@@ -319,7 +318,7 @@ class GeometrySetNodes(GeometrySetBase):
         if nodes is not None:
             self.add(nodes)
 
-    def add(self, value: _Union[_Node, list[_Node], "GeometrySetNodes"]) -> None:
+    def add(self, value: "_Node | list[_Node] | GeometrySetNodes") -> None:
         """Add nodes to this object.
 
         Args:

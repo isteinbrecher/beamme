@@ -71,7 +71,7 @@ class UniqueDataTracker:
     return an already matching element type ID or create a new one.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.unique_id_to_data: dict[int, dict] = {}
 
     def get_unique_id(self, data: dict) -> int:

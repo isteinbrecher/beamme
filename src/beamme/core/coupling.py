@@ -21,9 +21,6 @@
 # THE SOFTWARE.
 """This module implements a class to couple geometry together."""
 
-from typing import List as _List
-from typing import Union as _Union
-
 import numpy as _np
 
 import beamme.core.conf as _conf
@@ -41,9 +38,9 @@ class Coupling(_BoundaryConditionBase):
 
     def __init__(
         self,
-        geometry: _Union[_GeometrySetBase, _List[_Node]],
-        coupling_type: _Union[_conf.BoundaryCondition, str],
-        coupling_dof_type: _Union[_conf.CouplingDofType, dict],
+        geometry: _GeometrySetBase | list[_Node],
+        coupling_type: _conf.BoundaryCondition | str,
+        coupling_dof_type: _conf.CouplingDofType | dict,
         *,
         check_overlapping_nodes: bool = True,
     ):
@@ -99,9 +96,9 @@ class Coupling(_BoundaryConditionBase):
 
 
 def coupling_factory(
-    geometry: _Union[_GeometrySetBase, _List[_Node]],
+    geometry: _GeometrySetBase | list[_Node],
     coupling_type: _conf.BoundaryCondition,
-    coupling_dof_type: _Union[_conf.CouplingDofType, dict],
+    coupling_dof_type: _conf.CouplingDofType | dict,
     **kwargs,
 ) -> list[Coupling]:
     """Create coupling conditions for the nodes in geometry.

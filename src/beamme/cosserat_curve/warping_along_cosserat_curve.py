@@ -22,7 +22,6 @@
 """This file contains functionality to warp an existing mesh along a 1D
 curve."""
 
-from typing import Optional as _Optional
 from typing import Tuple as _Tuple
 
 import numpy as _np
@@ -238,7 +237,7 @@ def create_transform_boundary_conditions(
     mesh: _Mesh,
     curve: _CosseratCurve,
     *,
-    nodes: _Optional[list[_Node]] = None,
+    nodes: list[_Node] | None = None,
     t_end: float = 1.0,
     n_steps: int = 10,
     n_dof_per_node: int = 3,

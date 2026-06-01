@@ -22,8 +22,6 @@
 """This file contains a function to add the beam interaction conditions for
 4C."""
 
-from typing import Optional as _Optional
-
 import beamme.core.conf as _conf
 from beamme.core.boundary_condition import BoundaryCondition as _BoundaryCondition
 from beamme.core.geometry_set import GeometrySet as _GeometrySet
@@ -84,7 +82,7 @@ def add_beam_interaction_condition(
     geometry_set_2: _GeometrySet,
     bc_type: _conf.BoundaryCondition,
     *,
-    id: _Optional[int] = None,
+    id: int | None = None,
 ) -> int:
     """Adds a pair of beam interaction boundary conditions to the given mesh
     and estimates automatically the id of them based on all previously added
