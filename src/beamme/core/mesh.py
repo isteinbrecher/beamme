@@ -726,7 +726,7 @@ class Mesh:
         self,
     ) -> tuple[
         _MeshRepresentation,
-        dict[int, dict],
+        dict[int, _Any],
         dict[_GeometrySetBase, int],
         dict[_Material, int],
         dict[_NURBSPatch, int],

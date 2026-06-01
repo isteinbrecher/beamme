@@ -73,6 +73,8 @@ class FourCElementData:
 
     def __eq__(self, other) -> bool:
         """Check if two 4C element data objects are equal."""
+        if not isinstance(other, FourCElementData):
+            return False
         if self.four_c_cell != other.four_c_cell:
             return False
         if self.four_c_type != other.four_c_type:
@@ -91,7 +93,7 @@ def four_c_element_data_from_legacy_dict(
     input file.
 
     Args:
-        legacy_dict: The legacy element definition in the input file.
+        legacy_dict: The legacy element definition in the input file, will be modified in place.
 
     Returns:
         A tuple containing the 4C element data, the element ID, the connectivity, and the material ID.
