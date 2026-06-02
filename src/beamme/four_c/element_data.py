@@ -21,6 +21,8 @@
 # THE SOFTWARE.
 """Define a data class for 4C element data."""
 
+from dataclasses import dataclass as _dataclass
+from dataclasses import field as _field
 from typing import Any as _Any
 
 import numpy as _np
@@ -31,21 +33,13 @@ from beamme.utils.data_structures import (
 )
 
 
+@_dataclass(eq=False)
 class FourCElementData:
     """Class that contains the data for a 4C element block."""
 
-    def __init__(
-        self,
-        four_c_type: str,
-        four_c_cell: str,
-        element_technology: dict[str, _Any] | None = None,
-    ):
-        """Initialize the 4C element data."""
-        self.four_c_type = four_c_type
-        self.four_c_cell = four_c_cell
-        if element_technology is None:
-            element_technology = {}
-        self.element_technology = element_technology
+    four_c_type: str
+    four_c_cell: str
+    element_technology: dict[str, _Any] = _field(default_factory=dict)
 
     def get_legacy_dict(
         self, element_id, connectivity, element_material_id, additional_element_data
