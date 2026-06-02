@@ -147,7 +147,7 @@ def test_integration_four_c_model_importer_import_nested_materials_error():
     with pytest.raises(
         KeyError,
         match=re.escape(
-            "Material ID 3 not in material_id_map_all (available IDs: [1, 2])."
+            "Material ID 2 not in material_id_map_all (available IDs: [0, 1])."
         ),
     ):
         _extract_materials_from_input_file(input_file)
