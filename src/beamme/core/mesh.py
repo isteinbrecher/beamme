@@ -62,9 +62,6 @@ from beamme.core.rotation import Rotation as _Rotation
 from beamme.core.rotation import add_rotations as _add_rotations
 from beamme.core.rotation import rotate_coordinates as _rotate_coordinates
 from beamme.core.vtk_writer import VTKWriter as _VTKWriter
-from beamme.four_c.material import (
-    get_all_contained_materials as _get_all_contained_materials,
-)
 from beamme.geometric_search.find_close_points import (
     find_close_points as _find_close_points,
 )
@@ -719,36 +716,31 @@ class Mesh:
         return _get_nodes_by_function(self.nodes, *args, **kwargs)
 
     def get_mesh_representation(
-        self,
+        self, material_to_i_global: dict[_Material, int]
     ) -> tuple[
         _MeshRepresentation,
         dict[int, _Any],
         dict[_GeometrySetBase, int],
-        dict[_Material, int],
         dict[_NURBSPatch, int],
     ]:
         """Create a mesh representation for this mesh.
 
-        This function does not alter the mesh object. It assigns internal IDs to the mesh object and returns mappings between the objects and the IDs.
+        This function does not alter the mesh object. It assigns internal IDs to the
+        mesh object and returns mappings between the objects and the IDs.
+
+        Args:
+            material_to_i_global: A dictionary that maps materials to their global
+                index in the mesh representation.
 
         Returns:
             mesh_representation: `MeshRepresentation` object for this mesh.
-            element_type_id_to_data: A dictionary that maps the element type id to the data of the element type.
-            geometry_sets_to_i_global: A dictionary that maps geometry sets to their global index in the mesh representation.
-            material_to_i_global: A dictionary that maps materials to their global index in the mesh representation.
-            nurbs_patch_to_i_global: A dictionary that maps each NURBS patch to the global ID of that patch.
+            element_type_id_to_data: A dictionary that maps the element type id to the
+                data of the element type.
+            geometry_sets_to_i_global: A dictionary that maps geometry sets to their
+                global index in the mesh representation.
+            nurbs_patch_to_i_global: A dictionary that maps each NURBS patch to the
+                global ID of that patch.
         """
-
-        # Get a list of all materials in the mesh, including nested sub-materials
-        # and create he global ID mapping.
-        all_materials = [
-            material
-            for mesh_material in self.materials
-            for material in _get_all_contained_materials(mesh_material)
-        ]
-        material_to_i_global: dict[_Material, int] = {}
-        for material in all_materials:
-            material_to_i_global[material] = len(material_to_i_global)
 
         # Get the global id mappings for geometry sets.
         mesh_sets = self.get_unique_geometry_sets()
@@ -934,7 +926,6 @@ class Mesh:
             mesh_representation,
             element_type_id_to_data,
             geometry_sets_to_i_global,
-            material_to_i_global,
             nurbs_patch_to_i_global,
         )
 

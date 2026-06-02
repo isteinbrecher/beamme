@@ -23,13 +23,15 @@
 
 import pytest
 
+from beamme.core.mesh import Mesh
 from beamme.four_c.material import (
     MaterialKirchhoff,
     MaterialReissner,
     MaterialReissnerElastoplastic,
     MaterialSolid,
     MaterialStVenantKirchhoff,
-    get_all_contained_materials,
+    get_material_and_all_contained_sub_materials,
+    get_material_to_i_global_mapping,
 )
 
 
@@ -261,7 +263,7 @@ def test_beamme_four_c_material_sub_materials():
     material = MaterialSolid(
         material_string="mat", data={"MATIDS": [material_1, material_2, material_3]}
     )
-    sub_materials = get_all_contained_materials(material)
+    sub_materials = get_material_and_all_contained_sub_materials(material)
 
     sub_materials_reference = [
         material,
@@ -292,4 +294,28 @@ def test_beamme_four_c_material_sub_materials_circular_loop():
 
     # Check that the circular reference is detected
     with pytest.raises(ValueError, match="Circular material reference detected!"):
-        get_all_contained_materials(material_1)
+        get_material_and_all_contained_sub_materials(material_1)
+
+
+def test_beamme_four_c_material_sub_materials_indexing():
+    """Check the error for incorrectly added sub-materials."""
+
+    mesh = Mesh()
+    material_sub = MaterialSolid(
+        material_string="ELAST_CoupSVK", data={"YOUNG": 1.0, "NUE": 0.0}
+    )
+    mesh.add(material_sub)
+    material = MaterialSolid(
+        material_string="MAT_ElastHyper",
+        data={
+            "NUMMAT": 1,
+            "MATIDS": [material_sub],
+            "DENS": 1.0,
+        },
+    )
+    mesh.add(material)
+
+    material_to_i_global = get_material_to_i_global_mapping(mesh.materials)
+    assert len(material_to_i_global) == 2
+    assert material_to_i_global[material_sub] == 0
+    assert material_to_i_global[material] == 1

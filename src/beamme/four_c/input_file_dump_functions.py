@@ -54,6 +54,9 @@ from beamme.four_c.four_c_types import BeamType as _BeamType
 from beamme.four_c.input_file_mappings import (
     INPUT_FILE_MAPPINGS as _INPUT_FILE_MAPPINGS,
 )
+from beamme.four_c.material import (
+    get_material_to_i_global_mapping as _get_material_to_i_global_mapping,
+)
 
 
 def dump_function(function: _Function, i_global: int) -> dict[str, _Any]:
@@ -205,14 +208,16 @@ def dump_mesh_to_input_file(input_file, mesh: _Mesh) -> None:
         default=0,
     )
 
+    # Get material to global index mapping for the materials in the mesh.
+    material_to_i_global = _get_material_to_i_global_mapping(mesh.materials)
+
     # Get the mesh representation for the mesh.
     (
         mesh_representation,
         mesh_element_type_id_to_data,
         geometry_sets_to_i_global,
-        material_to_i_global,
         nurbs_patch_to_i_global,
-    ) = mesh.get_mesh_representation()
+    ) = mesh.get_mesh_representation(material_to_i_global)
     mesh_representation.offset_indices(
         element_type_id_offset=start_index_element_types,
         material_offset=start_index_materials,
