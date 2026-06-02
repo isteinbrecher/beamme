@@ -22,7 +22,6 @@
 """This file implements beam elements for 4C."""
 
 import warnings as _warnings
-from typing import Any as _Any
 
 import numpy as _np
 
@@ -30,6 +29,7 @@ from beamme.core.conf import bme as _bme
 from beamme.core.element_beam import Beam as _Beam
 from beamme.core.element_beam import Beam2 as _Beam2
 from beamme.core.element_beam import generate_beam_class as _generate_beam_class
+from beamme.four_c.element_data import FourCElementData as _FourCElementData
 from beamme.four_c.four_c_types import (
     BeamKirchhoffConstraintType as _BeamKirchhoffConstraintType,
 )
@@ -50,6 +50,11 @@ def get_four_c_reissner_beam(n_nodes: int, is_hermite_centerline: bool) -> type[
         _bme.element_type.beam, n_nodes
     ]
     element_technology = {"HERMITE_CENTERLINE": is_hermite_centerline}
+    data = _FourCElementData(
+        four_c_type=four_c_type,
+        four_c_cell=four_c_cell,
+        element_technology=element_technology,
+    )
 
     if is_hermite_centerline:
         coupling_fix_dict = {"NUMDOF": 9, "ONOFF": [1, 1, 1, 1, 1, 1, 0, 0, 0]}
@@ -64,7 +69,7 @@ def get_four_c_reissner_beam(n_nodes: int, is_hermite_centerline: bool) -> type[
         {
             "element_type": _bme.element_type.beam,
             "beam_type": _BeamType.reissner,
-            "data": {four_c_type: {four_c_cell: element_technology}},
+            "data": data,
             "coupling_fix_dict": coupling_fix_dict,
             "coupling_joint_dict": coupling_joint_dict,
         },
@@ -86,18 +91,23 @@ def get_four_c_kirchhoff_beam(
         )
 
     n_nodes = 3
+
     four_c_type = _INPUT_FILE_MAPPINGS["four_c_type_to_four_c_type"][
         _BeamType.kirchhoff
     ]
     four_c_cell = _INPUT_FILE_MAPPINGS["element_type_and_n_nodes_to_four_c_cell"][
         _bme.element_type.beam, n_nodes
     ]
-
     element_technology = {
         "CONSTRAINT": constraint.name,
         "PARAMETRIZATION": parametrization.name,
         "USE_FAD": is_fad,
     }
+    data = _FourCElementData(
+        four_c_type=four_c_type,
+        four_c_cell=four_c_cell,
+        element_technology=element_technology,
+    )
 
     coupling_fix_dict = {"NUMDOF": 7, "ONOFF": [1, 1, 1, 1, 1, 1, 0]}
     coupling_joint_dict = {"NUMDOF": 7, "ONOFF": [1, 1, 1, 0, 0, 0, 0]}
@@ -109,7 +119,7 @@ def get_four_c_kirchhoff_beam(
             "element_type": _bme.element_type.beam,
             "beam_type": _BeamType.kirchhoff,
             "kirchhoff_parametrization": parametrization,
-            "data": {four_c_type: {four_c_cell: element_technology}},
+            "data": data,
             "coupling_fix_dict": coupling_fix_dict,
             "coupling_joint_dict": coupling_joint_dict,
         },
@@ -121,13 +131,14 @@ class BeamFourCEulerBernoulli(_Beam2):
 
     element_type = _bme.element_type.beam
     beam_type = _BeamType.euler_bernoulli
-    data: dict[str, dict[str, _Any]] = {
-        _INPUT_FILE_MAPPINGS["four_c_type_to_four_c_type"][_BeamType.euler_bernoulli]: {
-            _INPUT_FILE_MAPPINGS["element_type_and_n_nodes_to_four_c_cell"][
-                _bme.element_type.beam, len(_Beam2.nodes_create)
-            ]: {}
-        }
-    }
+    data = _FourCElementData(
+        four_c_type=_INPUT_FILE_MAPPINGS["four_c_type_to_four_c_type"][
+            _BeamType.euler_bernoulli
+        ],
+        four_c_cell=_INPUT_FILE_MAPPINGS["element_type_and_n_nodes_to_four_c_cell"][
+            _bme.element_type.beam, len(_Beam2.nodes_create)
+        ],
+    )
 
     def check(self) -> None:
         """Check that the beam is straight and that the two rotations are the

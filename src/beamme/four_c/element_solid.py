@@ -34,6 +34,7 @@ from beamme.core.element_volume import VolumeTET10 as _VolumeTET10
 from beamme.core.element_volume import VolumeWEDGE6 as _VolumeWEDGE6
 from beamme.core.nurbs_patch import NURBSSurface as _NURBSSurface
 from beamme.core.nurbs_patch import NURBSVolume as _NURBSVolume
+from beamme.four_c.element_data import FourCElementData as _FourCElementData
 from beamme.four_c.input_file_mappings import (
     INPUT_FILE_MAPPINGS as _INPUT_FILE_MAPPINGS,
 )
@@ -104,11 +105,13 @@ def get_four_c_solid(
     four_c_cell = _INPUT_FILE_MAPPINGS["element_type_and_n_nodes_to_four_c_cell"][
         solid_type, n_nodes
     ]
+    data = _FourCElementData(
+        four_c_type=four_c_type,
+        four_c_cell=four_c_cell,
+        element_technology=element_technology,
+    )
     return type(
         "FourCSolidElementType",
         (base_type,),
-        {
-            "element_type": solid_type,
-            "data": {four_c_type: {four_c_cell: element_technology}},
-        },
+        {"element_type": solid_type, "data": data},
     )

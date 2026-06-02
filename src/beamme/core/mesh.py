@@ -25,6 +25,7 @@ elements, sets, ...) for a meshed geometry."""
 import copy as _copy
 import os as _os
 import warnings as _warnings
+from typing import Any as _Any
 from typing import List as _List
 from typing import cast as _cast
 
@@ -721,7 +722,7 @@ class Mesh:
         self,
     ) -> tuple[
         _MeshRepresentation,
-        dict[int, dict],
+        dict[int, _Any],
         dict[_GeometrySetBase, int],
         dict[_Material, int],
         dict[_NURBSPatch, int],
@@ -808,7 +809,7 @@ class Mesh:
         # Now that we know the expected size, we can allocate the data arrays and
         # actually gather the element data.
         element_type_to_id: dict[type, int] = {}
-        element_type_id_to_data: dict[int, dict] = {}
+        element_type_id_to_data: dict[int, _Any] = {}
         cell_connectivity = []
         cell_types = _np.full(n_elements, -1)
         cell_element_type_ids = _np.full(n_elements, -1)

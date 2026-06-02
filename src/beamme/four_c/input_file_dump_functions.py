@@ -21,7 +21,6 @@
 # THE SOFTWARE.
 """This file defines functions to dump mesh items for 4C."""
 
-import copy as _copy
 from collections import defaultdict as _defaultdict
 from typing import Any as _Any
 from typing import KeysView as _KeysView
@@ -47,6 +46,7 @@ from beamme.core.mesh_representation import (
 )
 from beamme.core.nurbs_patch import NURBSPatch as _NURBSPatch
 from beamme.core.rotation import Rotation as _Rotation
+from beamme.four_c.element_data import FourCElementData as _FourCElementData
 from beamme.four_c.four_c_types import (
     BeamKirchhoffParametrizationType as _BeamKirchhoffParametrizationType,
 )
@@ -323,7 +323,7 @@ def dump_mesh_to_input_file(input_file, mesh: _Mesh) -> None:
 def dump_mesh_representation_to_input_file_legacy(
     fourc_input: _FourCInput,
     mesh_representation: _MeshRepresentation,
-    element_type_id_to_data: dict[int, dict],
+    element_type_id_to_data: dict[int, _FourCElementData],
 ) -> None:
     """Dump the information contained in the mesh representation to the 4C
     input file via FourCIPP, in legacy format.
@@ -398,32 +398,16 @@ def dump_mesh_representation_to_input_file_legacy(
     ):
         element_type_data = element_type_id_to_data[element_type_id]
 
-        if len(element_type_data) == 1:
-            four_c_type, four_c_cell_dict = next(iter(element_type_data.items()))
-        else:
-            raise ValueError("Expected exactly one entry in type dictionary")
-        if len(four_c_cell_dict) == 1:
-            four_c_cell, four_c_data = next(iter(four_c_cell_dict.items()))
-        else:
-            raise ValueError("Expected exactly one entry in cell dictionary")
-
         node_ordering = _INPUT_FILE_MAPPINGS[
             "four_c_cell_to_connectivity_mapping_from_vtk"
-        ].get(four_c_cell, None)
+        ].get(element_type_data.four_c_cell, None)
         if node_ordering is not None:
             connectivity = connectivity[node_ordering]
 
-        if element_material_id == -1:
-            material_dict = {}
-        else:
-            material_dict = {"MAT": element_material_id + 1}
-
+        additional_element_data = None
         if _INPUT_FILE_MAPPINGS["four_c_type_to_requires_triads"].get(
-            four_c_type, False
+            element_type_data.four_c_type, False
         ):
-            # We modify the dict to add the rotation vectors, thus we create a
-            # deep copy here to avoid modifying the original data structure.
-            four_c_data = _copy.deepcopy(four_c_data)
             # The numpy quaternion package can return rotation vectors outside
             # the range of -pi to pi, which can cause issues in testing comparisons.
             # To avoid this, we convert the rotations to BeamMe internal rotations
@@ -433,7 +417,7 @@ def dump_mesh_representation_to_input_file_legacy(
             # be preferred when performance is of importance.
             if "rotation_vector" not in mesh_representation.point_data:
                 raise KeyError(
-                    f"Rotation vectors are required for type {four_c_type}, but "
+                    f"Rotation vectors are required for type {element_type_data.four_c_type}, but "
                     "no rotation vectors found in the mesh representation!"
                 )
             rotations = [
@@ -442,19 +426,19 @@ def dump_mesh_representation_to_input_file_legacy(
                     "rotation_vector"
                 ][connectivity]
             ]
-            four_c_data["TRIADS"] = _np.array(
-                [rotation.get_rotation_vector() for rotation in rotations]
-            ).ravel()
+            additional_element_data = {
+                "TRIADS": _np.array(
+                    [rotation.get_rotation_vector() for rotation in rotations]
+                ).ravel()
+            }
 
         element_list.append(
-            {
-                "id": start_index_elements + i_element + 1,
-                "cell": {
-                    "type": four_c_cell,
-                    "connectivity": start_index_nodes + connectivity + 1,
-                },
-                "data": {"type": four_c_type, **material_dict, **four_c_data},
-            }
+            element_type_data.get_legacy_dict(
+                element_id=start_index_elements + i_element,
+                connectivity=start_index_nodes + connectivity,
+                element_material_id=element_material_id,
+                additional_element_data=additional_element_data,
+            )
         )
     _dump("STRUCTURE ELEMENTS", element_list)
 

@@ -35,6 +35,7 @@ from fourcipp.utils.not_set import NOT_SET as _NOT_SET
 from beamme.core.conf import INPUT_FILE_HEADER as _INPUT_FILE_HEADER
 from beamme.core.mesh import Mesh as _Mesh
 from beamme.core.mesh_representation import MeshRepresentation as _MeshRepresentation
+from beamme.four_c.element_data import FourCElementData as _FourCElementData
 from beamme.four_c.input_file_dump_functions import (
     dump_mesh_representation_to_input_file_legacy as _dump_mesh_representation_to_input_file_legacy,
 )
@@ -66,7 +67,7 @@ class InputFile:
 
         # Mesh representation for this input file.
         self.mesh_representation = _MeshRepresentation()
-        self.element_type_id_to_data: dict[_Any, _Any] = {}
+        self.element_type_id_to_data: dict[_Any, _FourCElementData] = {}
 
     def __contains__(self, key: str) -> bool:
         """Contains function.

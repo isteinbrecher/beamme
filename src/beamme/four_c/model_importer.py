@@ -45,15 +45,16 @@ from beamme.core.mesh_representation import (
     string_to_geometry_set_info as _string_to_geometry_set_info,
 )
 from beamme.core.node import Node as _Node
+from beamme.four_c.element_data import FourCElementData as _FourCElementData
+from beamme.four_c.element_data import (
+    four_c_element_data_from_legacy_dict as _four_c_element_data_from_legacy_dict,
+)
 from beamme.four_c.element_solid import get_four_c_solid as _get_four_c_solid
 from beamme.four_c.input_file import InputFile as _InputFile
 from beamme.four_c.input_file_mappings import (
     INPUT_FILE_MAPPINGS as _INPUT_FILE_MAPPINGS,
 )
 from beamme.four_c.material import MaterialSolid as _MaterialSolid
-from beamme.utils.data_structures import (
-    compare_nested_dicts_or_lists as _compare_nested_dicts_or_lists,
-)
 from beamme.utils.environment import cubitpy_is_available as _cubitpy_is_available
 
 if _cubitpy_is_available():
@@ -72,9 +73,9 @@ class UniqueDataTracker:
     """
 
     def __init__(self) -> None:
-        self.unique_id_to_data: dict[int, dict] = {}
+        self.unique_id_to_data: dict[int, _FourCElementData] = {}
 
-    def get_unique_id(self, data: dict) -> int:
+    def get_unique_id(self, data: _FourCElementData) -> int:
         """Get the unique ID for the given data. If the data has not been seen
         before, a new ID will be assigned to it.
 
@@ -85,7 +86,7 @@ class UniqueDataTracker:
             The unique ID for the given data.
         """
         for unique_id, seen_data in self.unique_id_to_data.items():
-            if _compare_nested_dicts_or_lists(data, seen_data):
+            if data == seen_data:
                 return unique_id
 
         # If we reach this point, the data has not been seen before. We assign a new ID to it.
@@ -179,7 +180,7 @@ def _extract_mesh_from_input_file(input_file: _InputFile) -> tuple[_InputFile, _
 
 def _extract_mesh_representation(
     input_file: _InputFile,
-) -> tuple[_MeshRepresentation, dict[int, dict], dict[int, int]]:
+) -> tuple[_MeshRepresentation, dict[int, _FourCElementData], dict[int, int]]:
     """Extract the mesh representation from mesh data directly contained in the
     input file.
 
@@ -228,25 +229,15 @@ def _extract_mesh_representation(
     cell_element_type_ids = _np.full(n_elements, -1)
     cell_material_ids = _np.full(n_elements, -1)
     for i_element, input_element in enumerate(elements):
-        # At this point `input_element` contains the full element data. We can not
-        # compare this directly with the other block data dictionaries, we first
-        # need to extract connectivity and cell ID.
-        element_id = input_element.pop("id")
-        connectivity = (
-            _np.array(input_element["cell"].pop("connectivity"), dtype=int) - 1
+        four_c_element_data, element_id, connectivity, material_id = (
+            _four_c_element_data_from_legacy_dict(input_element)
         )
-        material_id = input_element["data"].pop("MAT", -1)
-
-        # Get the cell type, but keep it in the input element data
-        four_c_cell_type = input_element["cell"]["type"]
-
-        # Get the id of the current element
-        element_type_id = element_type_tracker.get_unique_id(input_element)
+        element_type_id = element_type_tracker.get_unique_id(four_c_element_data)
 
         # Check if connectivity has to be reordered
         reorder_indices = _INPUT_FILE_MAPPINGS[
             "four_c_cell_to_vtk_connectivity_mapping"
-        ].get(four_c_cell_type, None)
+        ].get(four_c_element_data.four_c_cell, None)
         if reorder_indices is not None:
             connectivity = connectivity[reorder_indices]
 
@@ -254,11 +245,11 @@ def _extract_mesh_representation(
 
         try:
             vtk_cell_type = _INPUT_FILE_MAPPINGS["four_c_cell_to_vtk_cell_type"][
-                four_c_cell_type
+                four_c_element_data.four_c_cell
             ]
         except KeyError:
             raise ValueError(
-                f"Unknown cell type `{four_c_cell_type}` for element {element_id}."
+                f"Unknown cell type `{four_c_element_data.four_c_cell}` for element {element_id}."
             )
 
         cell_types[i_element] = vtk_cell_type
@@ -375,21 +366,18 @@ def _create_mesh_from_mesh_representation(
         element_type_id,
         element_data,
     ) in element_type_id_to_data.items():
-        # We can modify this in place here, as `element_type_id_to_data` is not used anymore after this function.
-        four_c_type = element_data["data"].pop("type")
-        four_c_cell_type = element_data["cell"]["type"]
         element_type, n_nodes = _INPUT_FILE_MAPPINGS[
             "four_c_cell_to_element_type_and_n_nodes"
-        ][four_c_cell_type]
+        ][element_data.four_c_cell]
         if not element_type == _bme.element_type.solid:
             raise ValueError(
                 f"Mesh conversion for element type {element_type} is not implemented!"
             )
         element_type_id_to_element_type[element_type_id] = _get_four_c_solid(
             element_type,
-            four_c_type,
+            element_data.four_c_type,
             n_nodes=n_nodes,
-            element_technology=element_data["data"],
+            element_technology=element_data.element_technology,
         )
 
     # loop over the elements and create the mesh elements with the correct type, connectivity and material.
