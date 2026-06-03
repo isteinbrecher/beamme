@@ -100,7 +100,7 @@ def four_c_element_data_from_legacy_dict(
     # Since we directly store `legacy_dict["data"]` as the element technology data,
     # the material ID and four_c_type have to be removed from the `legacy_dict["data"]`
     # dictionary, thus the `pop`.
-    material_id = legacy_dict["data"].pop("MAT", -1)
+    material_id = legacy_dict["data"].pop("MAT", 0) - 1
     four_c_type = legacy_dict["data"].pop("type")
 
     data = FourCElementData(

@@ -28,7 +28,7 @@ from beamme.core.material import MaterialBeamBase as _MaterialBeamBase
 from beamme.core.material import MaterialSolidBase as _MaterialSolidBase
 
 
-def get_all_contained_materials(
+def get_material_and_all_contained_sub_materials(
     material: _Material, _visited_materials: set[int] | None = None
 ) -> list[_Material]:
     """Recursively collect all materials contained within a material, including
@@ -64,10 +64,36 @@ def get_all_contained_materials(
         for item in material.data["MATIDS"]:
             if isinstance(item, _Material):
                 contained_materials.extend(
-                    get_all_contained_materials(item, _visited_materials)
+                    get_material_and_all_contained_sub_materials(
+                        item, _visited_materials
+                    )
                 )
 
     return contained_materials
+
+
+def get_material_to_i_global_mapping(
+    materials: list[_Material],
+) -> dict[_Material, int]:
+    """Get a mapping of all materials in the mesh to their global IDs.
+
+    Args:
+        materials: A list of all materials in the mesh.
+
+    Returns:
+        A dictionary mapping each material to its global ID. This also includes
+        sub-materials contained within other materials.
+    """
+    all_materials = [
+        material
+        for mesh_material in materials
+        for material in get_material_and_all_contained_sub_materials(mesh_material)
+    ]
+    material_to_i_global: dict[_Material, int] = {}
+    for material in all_materials:
+        if material not in material_to_i_global:
+            material_to_i_global[material] = len(material_to_i_global)
+    return material_to_i_global
 
 
 class MaterialReissner(_MaterialBeamBase):

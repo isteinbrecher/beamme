@@ -466,7 +466,7 @@ def _extract_materials_from_input_file(
     material_id_map_all = {}
 
     for mat in input_file.pop("MATERIALS", []):
-        mat_id = mat.pop("MAT")
+        mat_id = mat.pop("MAT") - 1
         if len(mat) != 1:
             raise ValueError(
                 f"Could not convert the material data `{mat}` to a BeamMe material!"
@@ -477,18 +477,19 @@ def _extract_materials_from_input_file(
 
     nested_materials = set()
     for material in material_id_map_all.values():
-        # Loop over each material and link nested materials. Also, mark nested materials
-        # as they will not be added to the mesh.
-        material_ids = material.data.get("MATIDS", [])
-        for i_sub_material, material_id in enumerate(material_ids):
+        # Replace the integer IDs in the "MATIDS" list of the material with the actual
+        # material objects.
+        sub_materials = material.data.get("MATIDS", [])
+        sub_material_ids = _np.array(sub_materials) - 1
+        for i_sub_material, sub_material_id in enumerate(sub_material_ids):
             try:
-                material_ids[i_sub_material] = material_id_map_all[material_id]
+                sub_materials[i_sub_material] = material_id_map_all[sub_material_id]
             except KeyError as key_exception:
                 raise KeyError(
-                    f"Material ID {material_id} not in material_id_map_all (available "
+                    f"Material ID {sub_material_id} not in material_id_map_all (available "
                     f"IDs: {list(material_id_map_all.keys())})."
                 ) from key_exception
-            nested_materials.add(material_id)
+            nested_materials.add(sub_material_id)
 
     # Get a map of all non-nested materials. We assume that only those are used as
     # materials for elements. Also, add the non-nested materials to the mesh.
