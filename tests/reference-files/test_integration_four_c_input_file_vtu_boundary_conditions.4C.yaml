@@ -1,0 +1,47 @@
+STRUCTURE GEOMETRY:
+  FILE: "test_integration_four_c_input_file_vtu_boundary_conditions.mesh.vtu"
+  SHOW_INFO: "detailed_summary"
+  ELEMENT_BLOCKS:
+    - ID: 0
+      BEAM3R:
+        LINE3:
+          MAT: 1
+          HERMITE_CENTERLINE: true
+          NODAL_ROTATION_VECTORS: "element_rotation_vector_3"
+MATERIALS:
+  - MAT: 1
+    MAT_BeamReissnerElastHyper:
+      YOUNG: 1.0
+      POISSONRATIO: 0.3
+      DENS: 1.0
+      CROSSAREA: 3.141592653589793
+      SHEARCORR: 1.0
+      MOMINPOL: 1.5707963267948966
+      MOMIN2: 0.7853981633974483
+      MOMIN3: 0.7853981633974483
+DESIGN LINE NEUMANN CONDITIONS:
+  - E: 2
+    NUMDOF: 9
+    ONOFF: [1, 1, 1, 1, 1, 1, 1, 1, 1]
+    VAL: [4, 0, 0, 0, 0, 0, 0, 0, 0]
+    FUNCT: [0, 0, 0, 0, 0, 0, 0, 0, 0]
+    ENTITY_TYPE: "node_set_id"
+DESIGN POINT DIRICH CONDITIONS:
+  - E: 0
+    NUMDOF: 9
+    ONOFF: [1, 1, 1, 1, 1, 1, 1, 1, 1]
+    VAL: [1, 0, 0, 0, 0, 0, 0, 0, 0]
+    FUNCT: [0, 0, 0, 0, 0, 0, 0, 0, 0]
+    ENTITY_TYPE: "node_set_id"
+  - E: 0
+    NUMDOF: 9
+    ONOFF: [1, 1, 1, 1, 1, 1, 1, 1, 1]
+    VAL: [2, 0, 0, 0, 0, 0, 0, 0, 0]
+    FUNCT: [0, 0, 0, 0, 0, 0, 0, 0, 0]
+    ENTITY_TYPE: "node_set_id"
+  - E: 1
+    NUMDOF: 9
+    ONOFF: [1, 1, 1, 1, 1, 1, 1, 1, 1]
+    VAL: [3, 0, 0, 0, 0, 0, 0, 0, 0]
+    FUNCT: [0, 0, 0, 0, 0, 0, 0, 0, 0]
+    ENTITY_TYPE: "node_set_id"

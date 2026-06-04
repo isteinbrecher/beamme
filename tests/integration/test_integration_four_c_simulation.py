@@ -40,7 +40,8 @@ from beamme.four_c.dbc_monitor import (
     dbc_monitor_to_mesh,
     dbc_monitor_to_mesh_all_values,
 )
-from beamme.four_c.element_beam import Beam3rHerm2Line3
+from beamme.four_c.element_beam import Beam3rHerm2Line3, get_four_c_beam
+from beamme.four_c.four_c_types import BeamType
 from beamme.four_c.function_utility import create_linear_interpolation_function
 from beamme.four_c.header_functions import (
     add_result_description,
@@ -51,12 +52,17 @@ from beamme.four_c.header_functions import (
 )
 from beamme.four_c.input_file import InputFile
 from beamme.four_c.locsys_condition import LocSysCondition
-from beamme.four_c.material import MaterialReissner
+from beamme.four_c.material import (
+    MaterialEulerBernoulli,
+    MaterialKirchhoff,
+    MaterialReissner,
+)
 from beamme.four_c.model_importer import import_four_c_model
 from beamme.four_c.run_four_c import run_four_c
 from beamme.mesh_creation_functions.applications.beam_honeycomb import (
     create_beam_mesh_honeycomb,
 )
+from beamme.mesh_creation_functions.beam_arc import create_beam_mesh_arc_segment_2d
 from beamme.mesh_creation_functions.beam_line import create_beam_mesh_line
 from beamme.utils.nodes import check_node_by_coordinate
 
@@ -64,9 +70,26 @@ from beamme.utils.nodes import check_node_by_coordinate
 # call of 4C and compare the created input files, this allows to run some core
 # functionalities of this file even if 4C is not available. To achieve "full"
 # test coverage we also run the test, where we enforce 4C to be run.
+
+
 PYTEST_4C_SIMULATION_PARAMETRIZE = [
-    "enforce_four_c",
-    [False, pytest.param(True, marks=pytest.mark.fourc)],
+    "enforce_four_c,mesh_format",
+    (
+        (False, None),
+        pytest.param(True, "legacy", marks=pytest.mark.fourc),
+        pytest.param(True, "vtu", marks=pytest.mark.fourc),
+    ),
+]
+
+PYTEST_4C_SIMULATION_PARAMETRIZE_SOLID_IMPORT = [
+    "enforce_four_c,mesh_format,full_import",
+    (
+        (False, None, False),
+        (False, None, True),
+        pytest.param(True, "legacy", False, marks=pytest.mark.fourc),
+        pytest.param(True, "legacy", True, marks=pytest.mark.fourc),
+        pytest.param(True, "vtu", True, marks=pytest.mark.fourc),
+    ),
 ]
 
 
@@ -171,10 +194,10 @@ def create_cantilever_model(n_steps, time_step=0.5):
     return input_file, mesh, beam_set
 
 
-@pytest.mark.parametrize(*PYTEST_4C_SIMULATION_PARAMETRIZE)
-@pytest.mark.parametrize("full_import", (False, True))
+@pytest.mark.parametrize(*PYTEST_4C_SIMULATION_PARAMETRIZE_SOLID_IMPORT)
 def test_integration_four_c_simulation_honeycomb_sphere(
     enforce_four_c,
+    mesh_format,
     full_import,
     assert_results_close,
     get_corresponding_reference_file_path,
@@ -303,13 +326,13 @@ def test_integration_four_c_simulation_honeycomb_sphere(
         return
 
     # Run the input file in 4C.
-    run_four_c_test(input_file)
+    run_four_c_test(input_file, mesh_format=mesh_format)
 
 
-@pytest.mark.parametrize(*PYTEST_4C_SIMULATION_PARAMETRIZE)
-@pytest.mark.parametrize("full_import", (False, True))
+@pytest.mark.parametrize(*PYTEST_4C_SIMULATION_PARAMETRIZE_SOLID_IMPORT)
 def test_integration_four_c_simulation_beam_and_solid_tube(
     enforce_four_c,
+    mesh_format,
     full_import,
     assert_results_close,
     get_corresponding_reference_file_path,
@@ -407,12 +430,13 @@ def test_integration_four_c_simulation_beam_and_solid_tube(
         return
 
     # Run the input file in 4C.
-    run_four_c_test(input_file)
+    run_four_c_test(input_file, mesh_format=mesh_format)
 
 
 @pytest.mark.parametrize(*PYTEST_4C_SIMULATION_PARAMETRIZE)
 def test_integration_four_c_simulation_honeycomb_variants(
     enforce_four_c,
+    mesh_format,
     assert_results_close,
     get_corresponding_reference_file_path,
     run_four_c_test,
@@ -575,12 +599,13 @@ def test_integration_four_c_simulation_honeycomb_variants(
         return
 
     # Run the input file in 4C.
-    run_four_c_test(input_file)
+    run_four_c_test(input_file, mesh_format=mesh_format)
 
 
 @pytest.mark.parametrize(*PYTEST_4C_SIMULATION_PARAMETRIZE)
 def test_integration_four_c_simulation_rotated_beam_axis(
     enforce_four_c,
+    mesh_format,
     assert_results_close,
     get_corresponding_reference_file_path,
     run_four_c_test,
@@ -699,14 +724,17 @@ def test_integration_four_c_simulation_rotated_beam_axis(
         return
 
     # Run the input file in 4C.
-    run_four_c_test(input_file)
-    run_four_c_test(input_file, nox_xml_file="xml_name.xml")
+    run_four_c_test(input_file, mesh_format=mesh_format)
+
+    # For this test we also check if the input file works with a given xml path.
+    run_four_c_test(input_file, nox_xml_file="xml_name.xml", mesh_format=mesh_format)
 
 
 @pytest.mark.parametrize(*PYTEST_4C_SIMULATION_PARAMETRIZE)
 @pytest.mark.parametrize("all_values", (True, False))
 def test_integration_four_c_simulation_dbc_monitor_to_input(
     enforce_four_c,
+    mesh_format,
     all_values,
     assert_results_close,
     get_corresponding_reference_file_path,
@@ -777,7 +805,9 @@ def test_integration_four_c_simulation_dbc_monitor_to_input(
         return
 
     # Run the simulation in 4C
-    initial_run_dir, initial_run_name = run_four_c_test(initial_input_file)
+    initial_run_dir, initial_run_name = run_four_c_test(
+        initial_input_file, mesh_format=mesh_format
+    )
 
     # Create and run the second simulation.
     restart_input_file, restart_mesh, mesh_beam_set = create_cantilever_model(
@@ -843,13 +873,16 @@ def test_integration_four_c_simulation_dbc_monitor_to_input(
 
     # Run the restart simulation
     run_four_c_test(
-        restart_input_file, restart=[2, f"../{initial_run_name}/{initial_run_name}"]
+        restart_input_file,
+        restart=[2, f"../{initial_run_name}/{initial_run_name}"],
+        mesh_format=mesh_format,
     )
 
 
 @pytest.mark.parametrize(*PYTEST_4C_SIMULATION_PARAMETRIZE)
 def test_integration_four_c_simulation_dirichlet_boundary_to_neumann_boundary_with_all_values(
     enforce_four_c,
+    mesh_format,
     assert_results_close,
     get_corresponding_reference_file_path,
     run_four_c_test,
@@ -955,7 +988,7 @@ def test_integration_four_c_simulation_dirichlet_boundary_to_neumann_boundary_wi
         return
 
     # Run the simulation in 4C.
-    initial_run_dir, initial_run_name = run_four_c_test(initial_simulation)
+    initial_run_dir, _ = run_four_c_test(initial_simulation, mesh_format=mesh_format)
 
     # Create and run the second simulation.
     force_simulation, mesh, beam_set = create_cantilever_model(2 * n_steps, dt)
@@ -1001,19 +1034,20 @@ def test_integration_four_c_simulation_dirichlet_boundary_to_neumann_boundary_wi
 
     # Add runtime output.
     set_runtime_output(force_simulation)
-    run_four_c_test(force_simulation)
+    run_four_c_test(force_simulation, mesh_format=mesh_format)
 
 
 @pytest.mark.fourc
+@pytest.mark.parametrize("mesh_format", ("legacy", "vtu"))
 def test_integration_four_c_simulation_cantilever_convergence(
-    assert_results_close, run_four_c_test
+    mesh_format, assert_results_close, run_four_c_test
 ):
     """Create multiple simulations of a cantilever beam.
 
     This is a legacy test that used to test the simulation manager.
     """
 
-    def create_and_run_cantilever(n_el, *, n_proc=1):
+    def create_and_run_cantilever(n_el, mesh_format, *, n_proc=1):
         """Create a cantilever beam for a convergence analysis."""
 
         input_file = InputFile()
@@ -1058,7 +1092,9 @@ def test_integration_four_c_simulation_cantilever_convergence(
 
         input_file.add(mesh)
 
-        initial_run_dir, initial_run_name = run_four_c_test(input_file, n_proc=n_proc)
+        initial_run_dir, initial_run_name = run_four_c_test(
+            input_file, n_proc=n_proc, mesh_format=mesh_format
+        )
         my_data = np.genfromtxt(
             initial_run_dir / f"{initial_run_name}_energy.csv", delimiter=","
         )
@@ -1066,8 +1102,8 @@ def test_integration_four_c_simulation_cantilever_convergence(
 
     results = {}
     for n_el in range(1, 7, 2):
-        results[str(n_el)] = create_and_run_cantilever(n_el)
-    results["ref"] = create_and_run_cantilever(40, n_proc=4)
+        results[str(n_el)] = create_and_run_cantilever(n_el, mesh_format)
+    results["ref"] = create_and_run_cantilever(40, mesh_format, n_proc=4)
 
     results_ref = {
         "5": 0.335081498526998,
@@ -1081,6 +1117,7 @@ def test_integration_four_c_simulation_cantilever_convergence(
 @pytest.mark.parametrize(*PYTEST_4C_SIMULATION_PARAMETRIZE)
 def test_integration_four_c_simulation_beam_to_beam_contact_example(
     enforce_four_c,
+    mesh_format,
     assert_results_close,
     get_corresponding_reference_file_path,
     run_four_c_test,
@@ -1215,12 +1252,13 @@ def test_integration_four_c_simulation_beam_to_beam_contact_example(
     if not enforce_four_c:
         return
 
-    run_four_c_test(input_file, n_proc=1)
+    run_four_c_test(input_file, n_proc=1, mesh_format=mesh_format)
 
 
 @pytest.mark.parametrize(*PYTEST_4C_SIMULATION_PARAMETRIZE)
 def test_integration_four_c_simulation_locsys(
     enforce_four_c,
+    mesh_format,
     assert_results_close,
     get_corresponding_reference_file_path,
     run_four_c_test,
@@ -1365,4 +1403,187 @@ def test_integration_four_c_simulation_locsys(
     if not enforce_four_c:
         return
 
-    run_four_c_test(input_file, n_proc=1)
+    run_four_c_test(input_file, n_proc=1, mesh_format=mesh_format)
+
+
+@pytest.mark.parametrize(*PYTEST_4C_SIMULATION_PARAMETRIZE)
+def test_integration_four_c_simulation_beam_types(
+    enforce_four_c,
+    mesh_format,
+    get_corresponding_reference_file_path,
+    assert_results_close,
+    run_four_c_test,
+):
+    """Create an input file with many possible beam elements in 4C."""
+
+    # Parameters for example
+    l_beam = 2
+    r_beam = 0.05
+    E_beam = 1.5
+    F_tip = 0.00001
+    M_tip = 0.00001
+    n_el = 3
+
+    # Create materials
+    mat_reissner = MaterialReissner(radius=r_beam, youngs_modulus=E_beam)
+    mat_kirchhoff = MaterialKirchhoff(radius=r_beam, youngs_modulus=E_beam, is_fad=True)
+    mat_euler_bernoulli = MaterialEulerBernoulli(radius=r_beam, youngs_modulus=E_beam)
+
+    # Create the beams of the different types.
+    beam_type_and_material_list = [
+        [
+            get_four_c_beam(BeamType.reissner, n_nodes=3, is_hermite_centerline=True),
+            mat_reissner,
+            9,
+        ],
+        [
+            get_four_c_beam(BeamType.reissner, n_nodes=2, is_hermite_centerline=False),
+            mat_reissner,
+            9,
+        ],
+        [
+            get_four_c_beam(BeamType.reissner, n_nodes=3, is_hermite_centerline=False),
+            mat_reissner,
+            9,
+        ],
+        [
+            get_four_c_beam(BeamType.reissner, n_nodes=4, is_hermite_centerline=False),
+            mat_reissner,
+            9,
+        ],
+        [
+            get_four_c_beam(BeamType.reissner, n_nodes=5, is_hermite_centerline=False),
+            mat_reissner,
+            9,
+        ],
+        [
+            get_four_c_beam(BeamType.kirchhoff, n_nodes=3, is_hermite_centerline=True),
+            mat_kirchhoff,
+            7,
+        ],
+    ]
+
+    mesh = Mesh()
+    fun = Function([{"SYMBOLIC_FUNCTION_OF_TIME": "t"}])
+    mesh.add(fun)
+
+    for i_beam, (beam_type, mat, n_dof) in enumerate(beam_type_and_material_list):
+        # For all other beams, we create an arc segment with a general spatial rotation.
+        temp_mesh = Mesh()
+        arc_sets = create_beam_mesh_arc_segment_2d(
+            temp_mesh,
+            beam_type,
+            mat,
+            [i_beam, 0.0, 0.0],
+            l_beam,
+            0.0,
+            np.pi / 3,
+            n_el=n_el,
+        )
+        temp_mesh.rotate(Rotation([1, 0, 0], np.pi / 4))
+        temp_mesh.add(
+            BoundaryCondition(
+                arc_sets["start"],
+                {
+                    "NUMDOF": n_dof,
+                    "ONOFF": [1] * 6 + [0] * (n_dof - 6),
+                    "VAL": [0] * n_dof,
+                    "FUNCT": [0] * n_dof,
+                },
+                bc_type=bme.bc.dirichlet,
+            )
+        )
+        temp_mesh.add(
+            BoundaryCondition(
+                arc_sets["end"],
+                {
+                    "NUMDOF": n_dof,
+                    "ONOFF": [0, 0, 1, 0, 1, 0] + [0] * (n_dof - 6),
+                    "VAL": [0, 0, -F_tip, 0, M_tip, 0] + [0] * (n_dof - 6),
+                    "FUNCT": [0, 0, fun, 0, fun, 0] + [0] * (n_dof - 6),
+                },
+                bc_type=bme.bc.neumann,
+            )
+        )
+        mesh.add(temp_mesh)
+
+    # Add Euler-Bernoulli Euler beam as straight lines
+    temp_mesh = Mesh()
+    i_beam = len(beam_type_and_material_list)
+    line_sets = create_beam_mesh_line(
+        temp_mesh,
+        get_four_c_beam(
+            BeamType.euler_bernoulli, n_nodes=2, is_hermite_centerline=True
+        ),
+        mat_euler_bernoulli,
+        [i_beam + 2, 0.0, 0.0],
+        [i_beam + 2, l_beam, 0.0],
+        n_el=n_el,
+    )
+    n_dof = 6
+    temp_mesh.add(
+        BoundaryCondition(
+            line_sets["start"],
+            {
+                "NUMDOF": n_dof,
+                "ONOFF": [1, 1, 1, 1, 0, 1],
+                "VAL": [0] * n_dof,
+                "FUNCT": [0] * n_dof,
+            },
+            bc_type=bme.bc.dirichlet,
+        )
+    )
+    temp_mesh.add(
+        BoundaryCondition(
+            line_sets["end"],
+            {
+                "NUMDOF": n_dof,
+                "ONOFF": [0, 0, 1, 0, 0, 0],
+                "VAL": [0, 0, -F_tip, 0, 0, 0],
+                "FUNCT": [0, 0, fun, 0, 0, 0],
+            },
+            bc_type=bme.bc.neumann,
+        )
+    )
+    mesh.add(temp_mesh)
+
+    input_file = InputFile()
+    input_file.add(mesh)
+    set_header_static(
+        input_file,
+        total_time=1,
+        n_steps=10,
+        tol_residuum=1e-12,
+        tol_increment=1e-12,
+        max_iter=20,
+    )
+    set_runtime_output(
+        input_file, output_triad=False, every_iteration=False, output_strains=False
+    )
+
+    # Add expected results
+    displacements = [
+        [-1.15570927938992693e-01, 1.95361537841446442e-01, -1.47476276844591792e00],
+        [-9.90183981696275556e-02, 2.67426571209909480e-01, -1.42835350671466732e00],
+        [-1.17365704422868200e-01, 1.95603423654136271e-01, -1.46825700530571179e00],
+        [-1.17072604394807447e-01, 1.94950957348726278e-01, -1.47084336931870996e00],
+        [-1.17116032951594548e-01, 1.94940703576743840e-01, -1.47085042949177591e00],
+        [-1.16099377180482244e-01, 1.95214178539210387e-01, -1.47213749348602119e00],
+        [0.00000000000000000e00, -8.18795304041032290e-01, -1.45848605746626436e00],
+    ]
+    nodes_per_filament = np.array([7, 4, 7, 10, 13, 7, 4])
+    nodes = np.cumsum(nodes_per_filament)
+    add_result_description(input_file, displacements, nodes)
+
+    # Compare with the reference input file.
+    assert_results_close(
+        get_corresponding_reference_file_path(),
+        input_file,
+        four_c_input_file_data_format="vtu",
+    )
+
+    # Check if we still have to actually run 4C.
+    if not enforce_four_c:
+        return
+
+    run_four_c_test(input_file, n_proc=2, mesh_format=mesh_format)

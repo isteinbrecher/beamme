@@ -356,6 +356,8 @@ def dump_mesh_representation_to_input_file_legacy(
     def _dump(section_name: str, dictionary_list: _List):
         """Append the given list of dictionaries to the section in the input
         file."""
+        if len(dictionary_list) == 0:
+            return
         full_item_list = fourc_input.pop(section_name, [])
         full_item_list.extend(dictionary_list)
         fourc_input.combine_sections({section_name: full_item_list})

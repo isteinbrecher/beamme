@@ -35,6 +35,9 @@ from vistools.vtk.compare_grids import compare_grids
 
 from beamme.core.mesh import Mesh
 from beamme.four_c.input_file import InputFile
+from beamme.four_c.input_file_dump_functions import (
+    dump_mesh_representation_to_input_file_vtu,
+)
 from beamme.utils.data_structures import compare_nested_dicts_or_lists
 
 # GLOBAL DEFAULT TEST TOLERANCES
@@ -43,7 +46,9 @@ ABSOLUTE_TOLERANCE = 1e-13
 
 
 @pytest.fixture(scope="function")
-def assert_results_close(tmp_path, current_test_name) -> Callable:
+def assert_results_close(
+    tmp_path, current_test_name, get_corresponding_reference_file_path
+) -> Callable:
     """Return function to compare either string or files.
 
     Necessary to enable the function call through pytest fixtures.
@@ -52,6 +57,8 @@ def assert_results_close(tmp_path, current_test_name) -> Callable:
         tmp_path: Temporary path to write file if assertion fails.
         current_test_name: Name of the current test to create file
             if assertion fails.
+        get_corresponding_reference_file_path: Fixture to get the path of the
+            corresponding reference file.
 
     Returns:
         Function to compare results.
@@ -64,6 +71,7 @@ def assert_results_close(tmp_path, current_test_name) -> Callable:
         result: Path | str | int | float | dict | list | np.ndarray | InputFile | Mesh,
         rtol: float = RELATIVE_TOLERANCE,
         atol: float = ABSOLUTE_TOLERANCE,
+        four_c_input_file_data_format: str = "legacy",
     ) -> None:
         """Comparison between reference and result with relative or absolute
         tolerance.
@@ -75,11 +83,20 @@ def assert_results_close(tmp_path, current_test_name) -> Callable:
             result: The result data.
             rtol: The relative tolerance.
             atol: The absolute tolerance.
+            four_c_input_file_data_format: Mesh format for the FourC input file.
         """
 
         # convert all other types into dicts/lists
-        converted_reference = convert_to_primitive_type(reference)
-        converted_result = convert_to_primitive_type(result)
+        converted_reference = convert_to_primitive_type(
+            reference,
+            get_corresponding_reference_file_path=get_corresponding_reference_file_path,
+            four_c_input_file_data_format=four_c_input_file_data_format,
+        )
+        converted_result = convert_to_primitive_type(
+            result,
+            get_corresponding_reference_file_path=get_corresponding_reference_file_path,
+            four_c_input_file_data_format=four_c_input_file_data_format,
+        )
 
         try:
             compare_nested_dicts_or_lists(
@@ -102,12 +119,17 @@ def assert_results_close(tmp_path, current_test_name) -> Callable:
 
 def convert_to_primitive_type(
     obj: str | int | float | dict | list | np.ndarray | Path | Mesh | InputFile,
+    get_corresponding_reference_file_path: Callable,
+    four_c_input_file_data_format: str | None = None,
 ) -> int | float | dict | list | np.ndarray | pv.UnstructuredGrid:
     """Convert the given object to a primitive type, e.g., dict, list, numpy
     array, or pyvista grid.
 
     Args:
         obj: The object to convert.
+        get_corresponding_reference_file_path: Fixture to get the path of the
+            corresponding reference file.
+        four_c_input_file_data_format: Mesh format for the FourC input file.
 
     Returns:
         The raw data (either a dictionary, list, numpy array, or pyvista grid).
@@ -127,8 +149,24 @@ def convert_to_primitive_type(
             return pv.read(obj)
 
         elif obj.name.endswith(".4C.yaml"):
-            # return sections in next step
-            obj = InputFile().from_4C_yaml(input_file_path=obj)
+            # Return input file sections as dictionary
+            sections = (
+                InputFile().from_4C_yaml(input_file_path=obj).fourc_input.sections
+            )
+            if "STRUCTURE GEOMETRY" in sections:
+                # If external geometry is given, add the vtu file to the data structure
+                # for comparison.
+                mesh_file_name = Path(sections["STRUCTURE GEOMETRY"]["FILE"])
+                # Call the reference file function so we register this file in the used
+                # reference files.
+                mesh_file_path = get_corresponding_reference_file_path(
+                    reference_file_base_name=mesh_file_name.stem,
+                    extension="vtu",
+                )
+                sections["STRUCTURE GEOMETRY"]["FILE"] = pv.read(
+                    obj.parent / mesh_file_path
+                )
+            return sections
 
         elif obj.suffix == ".inp":
             # Abaqus input files are read as strings
@@ -144,7 +182,21 @@ def convert_to_primitive_type(
         obj = input_file
 
     if isinstance(obj, InputFile):
-        return obj.get_fourcipp_input_with_mesh().sections
+        if four_c_input_file_data_format == "legacy":
+            return obj.get_fourcipp_input_with_mesh().sections
+        elif four_c_input_file_data_format == "vtu":
+            fourc_input = obj.fourc_input.copy()
+            vtu_grid = dump_mesh_representation_to_input_file_vtu(
+                fourc_input, obj.mesh_representation, obj.element_type_id_to_data
+            )
+            # Add the grid to the dictionary containing the input file information
+            fourc_input["STRUCTURE GEOMETRY"]["FILE"] = vtu_grid
+            return fourc_input.sections
+        else:
+            raise ValueError(
+                f"Got unexpected argument {four_c_input_file_data_format} for "
+                "`four_c_input_file_data_format`."
+            )
 
     if isinstance(obj, str):
         # Comparison for string based Abaqus input files

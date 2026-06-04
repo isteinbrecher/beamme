@@ -1,0 +1,37 @@
+STRUCTURE GEOMETRY:
+  FILE: "test_integration_four_c_input_file_vtu_boundary_conditions_named_geometry_sets.mesh.vtu"
+  SHOW_INFO: "detailed_summary"
+  ELEMENT_BLOCKS:
+    - ID: 0
+      BEAM3EB:
+        LINE2:
+          MAT: 1
+MATERIALS:
+  - MAT: 1
+    MAT_BeamReissnerElastHyper:
+      YOUNG: 1.0
+      POISSONRATIO: 0.3
+      DENS: 1.0
+      CROSSAREA: 3.141592653589793
+      SHEARCORR: 1.0
+      MOMINPOL: 1.5707963267948966
+      MOMIN2: 0.7853981633974483
+      MOMIN3: 0.7853981633974483
+DESIGN LINE NEUMANN CONDITIONS:
+  - NUMDOF: 6
+    ONOFF: [1, 1, 1, 1, 1, 1]
+    VAL: [3, 0, 0, 0, 0, 0]
+    FUNCT: [0, 0, 0, 0, 0, 0]
+    NODE_SET_NAME: "beam_line"
+DESIGN POINT DIRICH CONDITIONS:
+  - NUMDOF: 6
+    ONOFF: [1, 1, 1, 1, 1, 1]
+    VAL: [1, 0, 0, 0, 0, 0]
+    FUNCT: [0, 0, 0, 0, 0, 0]
+    NODE_SET_NAME: "beam_start"
+  - NUMDOF: 6
+    ONOFF: [1, 1, 1, 1, 1, 1]
+    VAL: [2, 0, 0, 0, 0, 0]
+    FUNCT: [0, 0, 0, 0, 0, 0]
+    E: 1
+    ENTITY_TYPE: "node_set_id"
