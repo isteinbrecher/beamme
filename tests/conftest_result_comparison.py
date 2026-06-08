@@ -29,7 +29,7 @@ from typing import Any, Callable
 
 import numpy as np
 import pytest
-import vtk
+import pyvista as pv
 import xmltodict
 from vistools.vtk.compare_grids import compare_grids
 
@@ -77,16 +77,6 @@ def assert_results_close(tmp_path, current_test_name) -> Callable:
             atol: The absolute tolerance.
         """
 
-        # special case to compare vtk files
-        if (
-            isinstance(reference, Path)
-            and reference.suffix in {".vtk", ".vtu"}
-            and isinstance(result, Path)
-            and result.suffix in {".vtk", ".vtu"}
-        ):
-            compare_vtk_files(reference, result, rtol, atol)
-            return
-
         # convert all other types into dicts/lists
         converted_reference = convert_to_primitive_type(reference)
         converted_result = convert_to_primitive_type(result)
@@ -110,49 +100,17 @@ def assert_results_close(tmp_path, current_test_name) -> Callable:
     return _assert_results_close
 
 
-def compare_vtk_files(reference: Path, result: Path, rtol: float, atol: float) -> None:
-    """Compare two VTK files for equality within a given tolerance.
-
-    Args:
-        reference: The path to the reference VTK file.
-        result: The path to the result VTK file to be compared.
-        rtol: The relative tolerance.
-        atol: The absolute tolerance.
-    """
-
-    def get_vtk(path: Path) -> vtk.vtkDataObject:
-        """Return vtk data object for given vtk file.
-
-        Args:
-            path: Path to .vtu/.vtk file.
-
-        Returns:
-            VTK data object.
-        """
-
-        reader = vtk.vtkXMLGenericDataObjectReader()
-        reader.SetFileName(path)
-        reader.Update()
-        return reader.GetOutput()
-
-    compare = compare_grids(
-        get_vtk(reference), get_vtk(result), output=True, rtol=rtol, atol=atol
-    )
-
-    if not compare[0]:
-        raise AssertionError("\n".join(compare[1]))
-
-
 def convert_to_primitive_type(
     obj: str | int | float | dict | list | np.ndarray | Path | Mesh | InputFile,
-) -> int | float | dict | list | np.ndarray:
-    """Convert the given object to a primitive type (dict, list, numpy array).
+) -> int | float | dict | list | np.ndarray | pv.UnstructuredGrid:
+    """Convert the given object to a primitive type, e.g., dict, list, numpy
+    array, or pyvista grid.
 
     Args:
         obj: The object to convert.
 
     Returns:
-        The raw data (either a dictionary, list, numpy array).
+        The raw data (either a dictionary, list, numpy array, or pyvista grid).
     """
 
     if isinstance(obj, (int, float, dict, list, np.ndarray)):
@@ -164,6 +122,9 @@ def convert_to_primitive_type(
 
         elif obj.suffix == ".json":
             return json.loads(obj.read_text(encoding="utf-8"))
+
+        elif obj.suffix == ".vtu":
+            return pv.read(obj)
 
         elif obj.name.endswith(".4C.yaml"):
             # return sections in next step
@@ -218,7 +179,7 @@ def custom_fourcipp_comparison(
     """Custom comparison function for the FourCIPP
     compare_nested_dicts_or_lists function.
 
-    Comparison between two objects, either lists or numpy arrays.
+    Comparison between two special objects like numpy arrays or pyvista grids.
 
     Args:
         obj: The object to compare.
@@ -236,6 +197,14 @@ def custom_fourcipp_comparison(
             raise AssertionError(
                 f"Custom BeamMe comparison failed!\n\nThe objects are not equal:\n\nobj: {obj}\n\nreference_obj: {reference_obj}"
             )
+        return True
+
+    if isinstance(obj, pv.UnstructuredGrid) and isinstance(
+        reference_obj, pv.UnstructuredGrid
+    ):
+        compare = compare_grids(obj, reference_obj, output=True, rtol=rtol, atol=atol)
+        if not compare[0]:
+            raise AssertionError("\n".join(compare[1]))
         return True
 
     return None
