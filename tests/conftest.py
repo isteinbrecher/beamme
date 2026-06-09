@@ -213,7 +213,7 @@ def current_test_name(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(scope="function")
 def get_corresponding_reference_file_path(
-    reference_file_directory, current_test_name, request: pytest.FixtureRequest
+    reference_file_directory, current_test_name
 ) -> Callable:
     """Return function to get path to corresponding reference file for each
     test.
@@ -282,9 +282,8 @@ def get_corresponding_reference_file_path(
                 f"File path: {corresponding_reference_file_path} does not exist"
             )
 
-        # Track usage if flag is enabled
-        if request.config.getoption("--check-for-unused-reference-files"):
-            USED_REFERENCE_FILES.add(corresponding_reference_file_path.resolve())
+        # Track usage of reference files
+        USED_REFERENCE_FILES.add(corresponding_reference_file_path.resolve())
 
         return corresponding_reference_file_path
 

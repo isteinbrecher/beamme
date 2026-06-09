@@ -39,6 +39,7 @@ from beamme.four_c.input_file_dump_functions import (
     dump_mesh_representation_to_input_file_vtu,
 )
 from beamme.utils.data_structures import compare_nested_dicts_or_lists
+from tests.conftest import USED_REFERENCE_FILES
 
 # GLOBAL DEFAULT TEST TOLERANCES
 RELATIVE_TOLERANCE = 1e-13
@@ -88,14 +89,10 @@ def assert_results_close(
 
         # convert all other types into dicts/lists
         converted_reference = convert_to_primitive_type(
-            reference,
-            get_corresponding_reference_file_path=get_corresponding_reference_file_path,
-            four_c_input_file_data_format=four_c_input_file_data_format,
+            reference, four_c_input_file_data_format=four_c_input_file_data_format
         )
         converted_result = convert_to_primitive_type(
-            result,
-            get_corresponding_reference_file_path=get_corresponding_reference_file_path,
-            four_c_input_file_data_format=four_c_input_file_data_format,
+            result, four_c_input_file_data_format=four_c_input_file_data_format
         )
 
         try:
@@ -119,7 +116,6 @@ def assert_results_close(
 
 def convert_to_primitive_type(
     obj: str | int | float | dict | list | np.ndarray | Path | Mesh | InputFile,
-    get_corresponding_reference_file_path: Callable,
     four_c_input_file_data_format: str | None = None,
 ) -> int | float | dict | list | np.ndarray | pv.UnstructuredGrid:
     """Convert the given object to a primitive type, e.g., dict, list, numpy
@@ -127,8 +123,6 @@ def convert_to_primitive_type(
 
     Args:
         obj: The object to convert.
-        get_corresponding_reference_file_path: Fixture to get the path of the
-            corresponding reference file.
         four_c_input_file_data_format: Mesh format for the FourC input file.
 
     Returns:
@@ -156,16 +150,10 @@ def convert_to_primitive_type(
             if "STRUCTURE GEOMETRY" in sections:
                 # If external geometry is given, add the vtu file to the data structure
                 # for comparison.
-                mesh_file_name = Path(sections["STRUCTURE GEOMETRY"]["FILE"])
-                # Call the reference file function so we register this file in the used
-                # reference files.
-                mesh_file_path = get_corresponding_reference_file_path(
-                    reference_file_base_name=mesh_file_name.stem,
-                    extension="vtu",
-                )
-                sections["STRUCTURE GEOMETRY"]["FILE"] = pv.read(
-                    obj.parent / mesh_file_path
-                )
+                mesh_file_path = obj.parent / sections["STRUCTURE GEOMETRY"]["FILE"]
+                sections["STRUCTURE GEOMETRY"]["FILE"] = pv.read(mesh_file_path)
+                # Add the file to the set of used reference files.
+                USED_REFERENCE_FILES.add(mesh_file_path.resolve())
             return sections
 
         elif obj.suffix == ".inp":
