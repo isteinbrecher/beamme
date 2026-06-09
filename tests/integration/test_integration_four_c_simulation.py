@@ -76,7 +76,7 @@ PYTEST_4C_SIMULATION_PARAMETRIZE = [
     "enforce_four_c,mesh_format",
     (
         (False, None),
-        pytest.param(True, "legacy", marks=pytest.mark.fourc),
+        pytest.param(True, "yaml", marks=pytest.mark.fourc),
         pytest.param(True, "vtu", marks=pytest.mark.fourc),
     ),
 ]
@@ -86,8 +86,8 @@ PYTEST_4C_SIMULATION_PARAMETRIZE_SOLID_IMPORT = [
     (
         (False, None, False),
         (False, None, True),
-        pytest.param(True, "legacy", False, marks=pytest.mark.fourc),
-        pytest.param(True, "legacy", True, marks=pytest.mark.fourc),
+        pytest.param(True, "yaml", False, marks=pytest.mark.fourc),
+        pytest.param(True, "yaml", True, marks=pytest.mark.fourc),
         pytest.param(True, "vtu", True, marks=pytest.mark.fourc),
     ),
 ]
@@ -1038,7 +1038,7 @@ def test_integration_four_c_simulation_dirichlet_boundary_to_neumann_boundary_wi
 
 
 @pytest.mark.fourc
-@pytest.mark.parametrize("mesh_format", ("legacy", "vtu"))
+@pytest.mark.parametrize("mesh_format", ("yaml", "vtu"))
 def test_integration_four_c_simulation_cantilever_convergence(
     mesh_format, assert_results_close, run_four_c_test
 ):

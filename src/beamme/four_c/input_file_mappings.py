@@ -169,7 +169,7 @@ INPUT_FILE_MAPPINGS["boundary_conditions"] = {
     ): "DESIGN SURF MORTAR CONTACT CONDITIONS 3D",
 }
 # The definition of boundary conditions in 4C depends on the type of mesh output
-# (e.g., legacy or external mesh). When the actual input file is dumped, the correct
+# (e.g., yaml or external mesh). When the actual input file is dumped, the correct
 # definition for geometry sets has to be used. BeamMe does not know all possible
 # boundary condition sections in advance, therefore, we store all used boundary
 # condition sections here, so we can check against them when dumping the input file.

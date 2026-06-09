@@ -37,10 +37,10 @@ from beamme.core.mesh import Mesh as _Mesh
 from beamme.core.mesh_representation import MeshRepresentation as _MeshRepresentation
 from beamme.four_c.element_data import FourCElementData as _FourCElementData
 from beamme.four_c.input_file_dump_functions import (
-    dump_mesh_representation_to_input_file_legacy as _dump_mesh_representation_to_input_file_legacy,
+    dump_mesh_representation_to_input_file_vtu as _dump_mesh_representation_to_input_file_vtu,
 )
 from beamme.four_c.input_file_dump_functions import (
-    dump_mesh_representation_to_input_file_vtu as _dump_mesh_representation_to_input_file_vtu,
+    dump_mesh_representation_to_input_file_yaml as _dump_mesh_representation_to_input_file_yaml,
 )
 from beamme.four_c.input_file_dump_functions import (
     dump_mesh_to_input_file as _dump_mesh_to_input_file,
@@ -166,9 +166,9 @@ class InputFile:
 
     def get_fourcipp_input_with_mesh(self) -> _FourCInput:
         """Return a copy of the FourCIPP input file with the contents of the
-        mesh representation dumped to the legacy sections."""
+        mesh representation dumped to the yaml sections."""
         fourc_input = self.fourc_input.copy()
-        _dump_mesh_representation_to_input_file_legacy(
+        _dump_mesh_representation_to_input_file_yaml(
             fourc_input,
             self.mesh_representation,
             self.element_type_id_to_data,
@@ -179,7 +179,7 @@ class InputFile:
         self,
         input_file_path: str | _Path,
         *,
-        mesh_format: str = "legacy",
+        mesh_format: str = "yaml",
         vtu_binary: bool = False,
         nox_xml_file: str | None = None,
         add_header_default: bool = True,
@@ -197,7 +197,7 @@ class InputFile:
                 Path to the input file that should be created.
             mesh_format:
                 The format in which the mesh information should be written.
-                Currently, "vtu" and "legacy" are supported.
+                Currently, "vtu" and "yaml" are supported.
             vtu_binary:
                 Only relevant if mesh_format is "vtu". If True, the vtu file will
                 be written in binary format. Otherwise, it will be written in ascii format.
@@ -252,8 +252,8 @@ class InputFile:
             # Save the grid and add the file name to the input file
             vtu_grid.save(vtu_file_path, binary=vtu_binary)
             fourc_input["STRUCTURE GEOMETRY"]["FILE"] = vtu_file_path.name
-        elif mesh_format == "legacy":
-            _dump_mesh_representation_to_input_file_legacy(
+        elif mesh_format == "yaml":
+            _dump_mesh_representation_to_input_file_yaml(
                 fourc_input,
                 self.mesh_representation,
                 self.element_type_id_to_data,

@@ -47,7 +47,7 @@ from beamme.core.mesh_representation import (
 from beamme.core.node import Node as _Node
 from beamme.four_c.element_data import FourCElementData as _FourCElementData
 from beamme.four_c.element_data import (
-    four_c_element_data_from_legacy_dict as _four_c_element_data_from_legacy_dict,
+    four_c_element_data_from_yaml_dict as _four_c_element_data_from_yaml_dict,
 )
 from beamme.four_c.element_solid import get_four_c_solid as _get_four_c_solid
 from beamme.four_c.input_file import InputFile as _InputFile
@@ -230,7 +230,7 @@ def _extract_mesh_representation(
     cell_material_ids = _np.full(n_elements, -1)
     for i_element, input_element in enumerate(elements):
         four_c_element_data, element_id, connectivity, material_id = (
-            _four_c_element_data_from_legacy_dict(input_element)
+            _four_c_element_data_from_yaml_dict(input_element)
         )
         element_type_id = element_type_tracker.get_unique_id(four_c_element_data)
 

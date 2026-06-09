@@ -71,7 +71,7 @@ def assert_results_close(
         result: Path | str | int | float | dict | list | np.ndarray | InputFile | Mesh,
         rtol: float = RELATIVE_TOLERANCE,
         atol: float = ABSOLUTE_TOLERANCE,
-        four_c_input_file_data_format: str = "legacy",
+        four_c_input_file_data_format: str = "yaml",
     ) -> None:
         """Comparison between reference and result with relative or absolute
         tolerance.
@@ -182,7 +182,7 @@ def convert_to_primitive_type(
         obj = input_file
 
     if isinstance(obj, InputFile):
-        if four_c_input_file_data_format == "legacy":
+        if four_c_input_file_data_format == "yaml":
             return obj.get_fourcipp_input_with_mesh().sections
         elif four_c_input_file_data_format == "vtu":
             fourc_input = obj.fourc_input.copy()

@@ -332,13 +332,13 @@ def dump_mesh_to_input_file(input_file, mesh: _Mesh) -> None:
             dump_nurbs_patch_knotvectors(input_file, element)
 
 
-def dump_mesh_representation_to_input_file_legacy(
+def dump_mesh_representation_to_input_file_yaml(
     fourc_input: _FourCInput,
     mesh_representation: _MeshRepresentation,
     element_type_id_to_data: dict[int, _FourCElementData],
 ) -> None:
     """Dump the information contained in the mesh representation to the 4C
-    input file via FourCIPP, in legacy format.
+    input file via FourCIPP, in yaml format.
 
     Args:
         fourc_input: 4C input file via FourCIPP where the mesh information data will be dumped to.
@@ -447,7 +447,7 @@ def dump_mesh_representation_to_input_file_legacy(
             }
 
         element_list.append(
-            element_type_data.get_legacy_dict(
+            element_type_data.get_yaml_dict(
                 element_id=start_index_elements + i_element,
                 connectivity=start_index_nodes + connectivity,
                 element_material_id=element_material_id,
@@ -519,15 +519,15 @@ def dump_mesh_representation_to_input_file_vtu(
         The unstructured grid containing the vtu mesh.
     """
 
-    # VTU output can not be combined with legacy output.
-    n_legacy_nodes = len(fourc_input.sections.get("NODE COORDS", []))
-    n_legacy_elements = sum(
+    # VTU output can not be combined with yaml output.
+    n_yaml_nodes = len(fourc_input.sections.get("NODE COORDS", []))
+    n_yaml_elements = sum(
         len(fourc_input.sections.get(section, []))
         for section in ("FLUID ELEMENTS", "STRUCTURE ELEMENTS")
     )
-    if n_legacy_nodes > 0 or n_legacy_elements > 0:
+    if n_yaml_nodes > 0 or n_yaml_elements > 0:
         raise ValueError(
-            "Mesh output in `vtu` format is not possible if there are legacy nodes or "
+            "Mesh output in `vtu` format is not possible if there are yaml nodes or "
             "elements in the input file."
         )
 

@@ -66,10 +66,10 @@ class FourCElementData:
             },
         }
 
-    def get_legacy_dict(
+    def get_yaml_dict(
         self, element_id, connectivity, element_material_id, additional_element_data
     ) -> dict:
-        """Return the dictionary to write this element data to a legacy element
+        """Return the dictionary to write this element data to a yaml element
         definition in the input file."""
 
         return {
@@ -105,33 +105,33 @@ class FourCElementData:
         return True
 
 
-def four_c_element_data_from_legacy_dict(
-    legacy_dict: dict,
+def four_c_element_data_from_yaml_dict(
+    yaml_dict: dict,
 ) -> tuple[FourCElementData, int, _NDArray, int]:
-    """Extract the 4C element data from a legacy element definition in the
-    input file.
+    """Extract the 4C element data from a yaml element definition in the input
+    file.
 
     Args:
-        legacy_dict: The legacy element definition in the input file, will be modified in place.
+        yaml_dict: The yaml element definition in the input file, will be modified in place.
 
     Returns:
         A tuple containing the 4C element data, the element ID, the connectivity, and the material ID.
     """
 
-    element_id = legacy_dict["id"]
-    connectivity = _np.array(legacy_dict["cell"]["connectivity"], dtype=int) - 1
-    four_c_cell = legacy_dict["cell"]["type"]
+    element_id = yaml_dict["id"]
+    connectivity = _np.array(yaml_dict["cell"]["connectivity"], dtype=int) - 1
+    four_c_cell = yaml_dict["cell"]["type"]
 
-    # Since we directly store `legacy_dict["data"]` as the element technology data,
-    # the material ID and four_c_type have to be removed from the `legacy_dict["data"]`
+    # Since we directly store `yaml_dict["data"]` as the element technology data,
+    # the material ID and four_c_type have to be removed from the `yaml_dict["data"]`
     # dictionary, thus the `pop`.
-    material_id = legacy_dict["data"].pop("MAT", 0) - 1
-    four_c_type = legacy_dict["data"].pop("type")
+    material_id = yaml_dict["data"].pop("MAT", 0) - 1
+    four_c_type = yaml_dict["data"].pop("type")
 
     data = FourCElementData(
         four_c_type=four_c_type,
         four_c_cell=four_c_cell,
-        element_technology=legacy_dict["data"],
+        element_technology=yaml_dict["data"],
     )
 
     return data, element_id, connectivity, material_id
