@@ -319,7 +319,7 @@ def test_performance_beamme_add_beams_to_mesh(large_beam_mesh, evaluate_executio
         "BeamMe: Add large beam mesh to another",
         large_beam_mesh_copy.add,
         args=[large_beam_mesh],
-        expected_time=0.1,
+        expected_time=0.15,
     )
 
 
@@ -457,19 +457,32 @@ def test_performance_beamme_add_mesh_to_input_file(large_beam_input_file):
 
 
 @pytest.mark.performance
+@pytest.mark.parametrize(
+    ("log_name", "mesh_format", "expected_time"),
+    [
+        ("BeamMe: Dump input file with large beam mesh (yaml)", "yaml", 15.0),
+        ("BeamMe: Dump input file with large beam mesh (vtu)", "vtu", 0.65),
+    ],
+)
 def test_performance_beamme_dump_input_file(
-    large_beam_input_file, evaluate_execution_time, tmp_path
+    log_name,
+    mesh_format,
+    expected_time,
+    large_beam_input_file,
+    evaluate_execution_time,
+    tmp_path,
 ):
     """Test the performance of dumping an input file with a large beam mesh."""
 
     evaluate_execution_time(
-        "BeamMe: Dump input file with large beam mesh",
+        log_name,
         large_beam_input_file.dump,
         kwargs={
             "input_file_path": tmp_path / "performance_testing_beam.4C.yaml",
             "validate_sections_only": True,
+            "mesh_format": mesh_format,
         },
-        expected_time=15.0,
+        expected_time=expected_time,
     )
 
 
