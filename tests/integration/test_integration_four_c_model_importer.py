@@ -189,3 +189,154 @@ def test_integration_four_c_model_importer_non_consecutive_geometry_sets(
         ),
         input_file,
     )
+
+
+@pytest.mark.cubitpy
+@pytest.mark.parametrize("full_import", (False, True))
+def test_integration_four_c_model_importer_user_defined_node_set_and_block_ids(
+    full_import, get_corresponding_reference_file_path, assert_results_close
+):
+    """Test that user-defined node set and block IDs work as expected."""
+
+    from cubitpy import CubitPy
+    from cubitpy.conf import cupy
+
+    # Set up Cubit.
+    cubit = CubitPy()
+
+    # Initialize geometry
+    cubit.cmd("brick x 1 y 1 z 1")
+    cubit.cmd("brick x 5e-1 y 5e-1 z 5e-1")
+    cubit.cmd("move Volume 2 x 75e-2 y 0 z 0")
+    cubit.cmd("volume 1 size {5e-1}")
+    cubit.cmd("volume 2 size {2.5e-1}")
+
+    # mesh the two geometries
+    cubit.cmd("mesh volume 1")
+    cubit.cmd("mesh volume 2")
+
+    # Assign nodesets, required for boundary conditions
+    cubit.add_node_set(
+        cubit.group(add_value="add surface 6"),
+        name="slave",
+        bc_type=cupy.bc_type.solid_to_solid_contact,
+        bc_description={
+            "InterfaceID": 6,
+            "Side": "Slave",
+        },
+    )
+    cubit.add_node_set(
+        cubit.group(add_value="add surface 10"),
+        name="master",
+        bc_type=cupy.bc_type.solid_to_solid_contact,
+        bc_description={
+            "InterfaceID": 10,
+            "Side": "Master",
+        },
+    )
+    cubit.add_node_set(
+        cubit.group(add_value="add surface 4"),
+        name="wall",
+        bc_type=cupy.bc_type.dirichlet,
+        bc_description={
+            "NUMDOF": 3,
+            "ONOFF": [4, 0, 0],
+            "VAL": [0, 0, 0],
+            "FUNCT": [None, None, None],
+        },
+        node_set_id=17,
+    )
+    cubit.add_node_set(
+        cubit.group(add_value="add surface 12"),
+        name="pushing",
+        bc_type=cupy.bc_type.dirichlet,
+        bc_description={
+            "NUMDOF": 3,
+            "ONOFF": [12, 0, 0],
+            "VAL": [-1.0, 0.0, 0.0],
+            "FUNCT": [1, None, None],
+        },
+    )
+
+    cubit.add_node_set(
+        cubit.group(add_value="add curve 1"),
+        name="curve_1",
+        bc_type=cupy.bc_type.neumann,
+        bc_description={
+            "NUMDOF": 3,
+            "ONOFF": [1, 0, 0],
+            "VAL": [1.0, 0.0, 0.0],
+            "FUNCT": [None, None, None],
+        },
+    )
+    cubit.add_node_set(
+        cubit.group(add_value="add curve 2"),
+        name="curve_2",
+        bc_type=cupy.bc_type.neumann,
+        bc_description={
+            "NUMDOF": 3,
+            "ONOFF": [2, 0, 0],
+            "VAL": [1.0, 0.0, 0.0],
+            "FUNCT": [None, None, None],
+        },
+    )
+    cubit.add_node_set(
+        cubit.group(add_value="add curve 3"),
+        name="curve_3",
+        bc_type=cupy.bc_type.neumann,
+        bc_description={
+            "NUMDOF": 3,
+            "ONOFF": [3, 0, 0],
+            "VAL": [1.0, 0.0, 0.0],
+            "FUNCT": [None, None, None],
+        },
+        node_set_id=15,
+    )
+
+    # Add the element types
+    cubit.add_element_type(
+        cubit.group(add_value="add volume 1"),
+        el_type=cupy.element_type.hex8,
+        material={
+            "MAT": 1,
+        },
+        bc_description={
+            "KINEM": "nonlinear",
+        },
+        block_id=27,
+    )
+    cubit.add_element_type(
+        cubit.group(add_value="add volume 2"),
+        el_type=cupy.element_type.hex8,
+        material={
+            "MAT": 2,
+        },
+        bc_description={
+            "KINEM": "nonlinear",
+        },
+        block_id=1,
+    )
+
+    # Add the materials
+    cubit.fourc_input["MATERIALS"] = [
+        {
+            "MAT": 1,
+            "MAT_Struct_StVenantKirchhoff": {"DENS": 1, "NUE": 0.3, "YOUNG": 2},
+        },
+        {
+            "MAT": 2,
+            "MAT_Struct_StVenantKirchhoff": {"DENS": 2, "NUE": 0.3, "YOUNG": 2},
+        },
+    ]
+
+    # Load into BeamMe
+    input_file, mesh = import_cubitpy_model(cubit, convert_input_to_mesh=full_import)
+    input_file.add(mesh)
+
+    # Compare with reference file.
+    assert_results_close(
+        get_corresponding_reference_file_path(
+            additional_identifier="full_import" if full_import else "dict_import"
+        ),
+        input_file,
+    )
