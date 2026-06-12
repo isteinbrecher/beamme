@@ -34,7 +34,12 @@ from beamme.four_c.model_importer import (
     import_four_c_model,
 )
 from beamme.mesh_creation_functions.beam_line import create_beam_mesh_line
+from beamme.utils.environment import cubitpy_is_available
 from tests.create_test_models import create_multiple_solid_bricks, create_tube_cubit
+
+if cubitpy_is_available():
+    from cubitpy import CubitPy
+    from cubitpy.conf import cupy
 
 
 @pytest.mark.parametrize("full_import", (False, True))
@@ -95,6 +100,31 @@ def test_integration_four_c_model_importer_solid_element_types_from_input_file(
         input_file.add(mesh)
 
     assert_results_close(reference_file, input_file)
+
+
+@pytest.mark.parametrize("full_import", (False, True))
+def test_integration_four_c_model_importer_solid_element_types_from_input_file_with_exodus(
+    full_import, assert_results_close, get_corresponding_reference_file_path
+):
+    """Check that all supported solid element types are imported correctly from
+    an input file with an exodus mesh."""
+
+    # We never need to directly reference the exodus file, with `get_corresponding_reference_file_path`
+    # so we do a dummy reference here, to avoid a failing reference file check
+    # in CI.
+    get_corresponding_reference_file_path(extension="exo")
+
+    input_file_path = get_corresponding_reference_file_path()
+    input_file, mesh = import_four_c_model(
+        input_file_path=input_file_path, convert_input_to_mesh=full_import
+    )
+    if full_import:
+        input_file.add(mesh)
+
+    reference_file_path = get_corresponding_reference_file_path(
+        reference_file_base_name="test_other_create_cubit_input_files_multiple_solid_bricks"
+    )
+    assert_results_close(reference_file_path, input_file)
 
 
 def test_integration_four_c_model_importer_import_nested_materials(
@@ -198,9 +228,6 @@ def test_integration_four_c_model_importer_user_defined_node_set_and_block_ids(
 ):
     """Test that user-defined node set and block IDs work as expected."""
 
-    from cubitpy import CubitPy
-    from cubitpy.conf import cupy
-
     # Set up Cubit.
     cubit = CubitPy()
 
@@ -293,6 +320,8 @@ def test_integration_four_c_model_importer_user_defined_node_set_and_block_ids(
         node_set_id=15,
     )
 
+    cubit.add_node_set(cubit.group(add_value="add curve 4"), name="set_without_bc")
+
     # Add the element types
     cubit.add_element_type(
         cubit.group(add_value="add volume 1"),
@@ -332,6 +361,22 @@ def test_integration_four_c_model_importer_user_defined_node_set_and_block_ids(
     # Load into BeamMe
     input_file, mesh = import_cubitpy_model(cubit, convert_input_to_mesh=full_import)
     input_file.add(mesh)
+
+    if full_import:
+        named_geometry_sets = mesh.get_named_geometry_sets()
+        assert len(named_geometry_sets) == 8
+        assert set(
+            [
+                "curve_1",
+                "curve_2",
+                "curve_3",
+                "master",
+                "pushing",
+                "set_without_bc",
+                "slave",
+                "wall",
+            ]
+        ) == set(named_geometry_sets.keys())
 
     # Compare with reference file.
     assert_results_close(

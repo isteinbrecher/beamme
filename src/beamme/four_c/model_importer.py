@@ -59,6 +59,9 @@ from beamme.four_c.input_file_mappings import (
     INPUT_FILE_MAPPINGS as _INPUT_FILE_MAPPINGS,
 )
 from beamme.four_c.material import MaterialSolid as _MaterialSolid
+from beamme.utils.data_structures import (
+    create_inverse_mapping as _create_inverse_mapping,
+)
 from beamme.utils.environment import cubitpy_is_available as _cubitpy_is_available
 
 if _cubitpy_is_available():
@@ -496,12 +499,17 @@ def _extract_mesh_representation_from_exo(
             )
 
     # Remove the entries in the boundary condition definitions in the input file that
-    # are exodus specific.
+    # are exodus specific. Also, set the geometry set IDs in the boundary conditions to
+    # the ones in the mesh representation.
+    node_set_id_input_file_to_mesh_representation = _create_inverse_mapping(
+        node_set_id_mesh_representation_to_input_file
+    )
     for section_name in input_file.sections:
         if section_name in _INPUT_FILE_MAPPINGS["boundary_conditions"].values():
             items = input_file.pop(section_name)
             for bc in items:
                 bc.pop("ENTITY_TYPE")
+                bc["E"] = node_set_id_input_file_to_mesh_representation[bc["E"]] + 1
             input_file.add({section_name: items})
 
     # Create the mesh representation
@@ -520,7 +528,7 @@ def _extract_mesh_representation_from_exo(
     return (
         mesh_representation,
         element_type_tracker.unique_id_to_data,
-        node_set_id_mesh_representation_to_input_file,
+        {i: i + 1 for i in range(len(node_set_id_mesh_representation_to_input_file))},
     )
 
 
