@@ -43,7 +43,7 @@ if cubitpy_is_available():
 
 
 @pytest.mark.parametrize("full_import", (False, True))
-@pytest.mark.cubitpy
+@pytest.mark.coreform
 def test_integration_four_c_model_importer_import_cubitpy_model(
     full_import, assert_results_close, get_corresponding_reference_file_path
 ):
@@ -65,7 +65,7 @@ def test_integration_four_c_model_importer_import_cubitpy_model(
 
 
 @pytest.mark.parametrize("full_import", (False, True))
-@pytest.mark.cubitpy
+@pytest.mark.coreform
 def test_integration_four_c_model_importer_solid_element_types_from_cubitpy(
     full_import, assert_results_close, get_corresponding_reference_file_path
 ):
@@ -221,7 +221,7 @@ def test_integration_four_c_model_importer_non_consecutive_geometry_sets(
     )
 
 
-@pytest.mark.cubitpy
+@pytest.mark.coreform
 @pytest.mark.parametrize("full_import", (False, True))
 def test_integration_four_c_model_importer_user_defined_node_set_and_block_ids(
     full_import, get_corresponding_reference_file_path, assert_results_close
