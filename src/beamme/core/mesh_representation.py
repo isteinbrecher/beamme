@@ -222,13 +222,21 @@ class MeshRepresentation:
         """
         return len(self.points)
 
-    def connectivity_iterator(self) -> _Iterable:
+    def connectivity_iterator(
+        self, *, element_indices: list[int] | _NDArray[_np.integer] | None = None
+    ) -> _Iterable:
         """Return an iterator over the cell connectivity.
+
+        Args:
+            element_indices: If this argument is given, only iterate over the
+                given indices.
 
         Returns:
             An iterator that returns the connectivity array for each cell.
         """
-        for i in range(self.n_cells):
+        if element_indices is None:
+            element_indices = _np.arange(self.n_cells)
+        for i in element_indices:
             start = self.cell_connectivity_offsets[i] + 1
             end = self.cell_connectivity_offsets[i + 1]
             yield self.cell_connectivity[start:end]

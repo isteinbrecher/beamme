@@ -37,7 +37,10 @@ from beamme.core.mesh import Mesh as _Mesh
 from beamme.core.mesh_representation import MeshRepresentation as _MeshRepresentation
 from beamme.four_c.element_data import FourCElementData as _FourCElementData
 from beamme.four_c.input_file_dump_functions import (
-    dump_mesh_representation_to_input_file_legacy as _dump_mesh_representation_to_input_file_legacy,
+    dump_mesh_representation_to_input_file_vtu as _dump_mesh_representation_to_input_file_vtu,
+)
+from beamme.four_c.input_file_dump_functions import (
+    dump_mesh_representation_to_input_file_yaml as _dump_mesh_representation_to_input_file_yaml,
 )
 from beamme.four_c.input_file_dump_functions import (
     dump_mesh_to_input_file as _dump_mesh_to_input_file,
@@ -163,9 +166,9 @@ class InputFile:
 
     def get_fourcipp_input_with_mesh(self) -> _FourCInput:
         """Return a copy of the FourCIPP input file with the contents of the
-        mesh representation dumped to the legacy sections."""
+        mesh representation dumped to the yaml sections."""
         fourc_input = self.fourc_input.copy()
-        _dump_mesh_representation_to_input_file_legacy(
+        _dump_mesh_representation_to_input_file_yaml(
             fourc_input,
             self.mesh_representation,
             self.element_type_id_to_data,
@@ -176,6 +179,8 @@ class InputFile:
         self,
         input_file_path: str | _Path,
         *,
+        mesh_format: str = "yaml",
+        vtu_binary: bool = False,
         nox_xml_file: str | None = None,
         add_header_default: bool = True,
         add_header_information: bool = True,
@@ -190,6 +195,12 @@ class InputFile:
         Args:
             input_file_path:
                 Path to the input file that should be created.
+            mesh_format:
+                The format in which the mesh information should be written.
+                Currently, "vtu" and "yaml" are supported.
+            vtu_binary:
+                Only relevant if mesh_format is "vtu". If True, the vtu file will
+                be written in binary format. Otherwise, it will be written in ascii format.
             nox_xml_file:
                 If this is a string, the NOX xml file will be created with this
                 name. If this is None, the NOX xml file will be created with the
@@ -217,26 +228,48 @@ class InputFile:
         # Make sure the given input file is a Path instance.
         input_file_path = _Path(input_file_path)
 
+        # Base name of the input file without extension.
+        if not input_file_path.name.endswith(".4C.yaml"):
+            raise ValueError(
+                "Input file must have a .4C.yaml extension, but got the "
+                f"path {input_file_path}"
+            )
+        input_file_base_name = input_file_path.name.removesuffix(".4C.yaml")
+
         # Create a deep copy of the existing input sections - this function should not alter
         # the present instance of InputFile
         fourc_input = self.fourc_input.copy()
 
+        # Add the mesh representation, either directly to the yaml input file or via an
+        # external mesh format.
+        if mesh_format == "vtu":
+            vtu_file_path = input_file_path.parent / (
+                input_file_base_name + ".mesh.vtu"
+            )
+            vtu_grid = _dump_mesh_representation_to_input_file_vtu(
+                fourc_input, self.mesh_representation, self.element_type_id_to_data
+            )
+            # Save the grid and add the file name to the input file
+            vtu_grid.save(vtu_file_path, binary=vtu_binary)
+            fourc_input["STRUCTURE GEOMETRY"]["FILE"] = vtu_file_path.name
+        elif mesh_format == "yaml":
+            _dump_mesh_representation_to_input_file_yaml(
+                fourc_input,
+                self.mesh_representation,
+                self.element_type_id_to_data,
+            )
+        else:
+            raise ValueError(f"Unsupported mesh format: {mesh_format}.")
+
         if self.nox_xml_contents:
             if nox_xml_file is None:
-                nox_xml_file = input_file_path.name.split(".")[0] + ".nox.xml"
+                nox_xml_file = input_file_base_name + ".nox.xml"
 
             fourc_input["STRUCT NOX/Status Test"] = {"XML File": nox_xml_file}
 
             # Write the xml file to the disc.
             with open(input_file_path.parent / nox_xml_file, "w") as xml_file:
                 xml_file.write(self.nox_xml_contents)
-
-        # Dump the mesh representation.
-        _dump_mesh_representation_to_input_file_legacy(
-            fourc_input,
-            self.mesh_representation,
-            self.element_type_id_to_data,
-        )
 
         # Add information header to the input file
         if add_header_information:

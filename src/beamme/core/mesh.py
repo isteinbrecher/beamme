@@ -894,17 +894,17 @@ class Mesh:
                     i_global=geometry_sets_to_i_global[geometry_set],
                     point_flag_vector=node_set_flag,
                     cell_flag_vector=element_set_flag,
+                    name=geometry_set.name,
                 )
                 geometry_sets.append(geometry_set_wrapper)
 
         # Reset the previously set indices.
-        for i, node in enumerate(self.nodes):
+        for node in self.nodes:
             node.i_global = None
         for element in self.elements:
             element.i_global = None
 
-        # TODO: Let's sort the cells by their block ID here - in most solvers, the
-        # the elements are internally sorted by their block IDs anyway.
+        # Create the mesh representation.
         mesh_representation = _MeshRepresentation(
             cell_connectivity=cell_connectivity,
             cell_types=cell_types,

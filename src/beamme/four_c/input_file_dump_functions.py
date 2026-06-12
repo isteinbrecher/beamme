@@ -27,6 +27,7 @@ from typing import KeysView as _KeysView
 from typing import List as _List
 
 import numpy as _np
+import pyvista as _pv
 from fourcipp.fourc_input import FourCInput as _FourCInput
 
 from beamme.core.boundary_condition import BoundaryCondition as _BoundaryCondition
@@ -37,6 +38,7 @@ from beamme.core.function import Function as _Function
 from beamme.core.geometry_set import GeometrySetBase as _GeometrySetBase
 from beamme.core.material import Material as _Material
 from beamme.core.mesh import Mesh as _Mesh
+from beamme.core.mesh_representation import GeometrySetInfo as _GeometrySetInfo
 from beamme.core.mesh_representation import MeshRepresentation as _MeshRepresentation
 from beamme.core.mesh_representation import (
     merge_mesh_representations as _merge_mesh_representations,
@@ -56,6 +58,9 @@ from beamme.four_c.input_file_mappings import (
 )
 from beamme.four_c.material import (
     get_material_to_i_global_mapping as _get_material_to_i_global_mapping,
+)
+from beamme.utils.data_structures import (
+    create_inverse_mapping as _create_inverse_mapping,
 )
 
 
@@ -308,11 +313,13 @@ def dump_mesh_to_input_file(input_file, mesh: _Mesh) -> None:
     # Dump boundary conditions
     for (bc_key, geometry_key), bc_list in mesh.boundary_conditions.items():
         if bc_list:
-            section = (
-                bc_key
-                if isinstance(bc_key, str)
-                else _INPUT_FILE_MAPPINGS["boundary_conditions"][(bc_key, geometry_key)]
-            )
+            if isinstance(bc_key, str):
+                _INPUT_FILE_MAPPINGS["known_boundary_condition_sections"].add(bc_key)
+                section = bc_key
+            else:
+                section = _INPUT_FILE_MAPPINGS["boundary_conditions"][
+                    (bc_key, geometry_key)
+                ]
             _dump(section, bc_list)
 
     # If we have previously set the node links, we unlink them here.
@@ -325,13 +332,13 @@ def dump_mesh_to_input_file(input_file, mesh: _Mesh) -> None:
             dump_nurbs_patch_knotvectors(input_file, element)
 
 
-def dump_mesh_representation_to_input_file_legacy(
+def dump_mesh_representation_to_input_file_yaml(
     fourc_input: _FourCInput,
     mesh_representation: _MeshRepresentation,
     element_type_id_to_data: dict[int, _FourCElementData],
 ) -> None:
     """Dump the information contained in the mesh representation to the 4C
-    input file via FourCIPP, in legacy format.
+    input file via FourCIPP, in yaml format.
 
     Args:
         fourc_input: 4C input file via FourCIPP where the mesh information data will be dumped to.
@@ -349,6 +356,8 @@ def dump_mesh_representation_to_input_file_legacy(
     def _dump(section_name: str, dictionary_list: _List):
         """Append the given list of dictionaries to the section in the input
         file."""
+        if len(dictionary_list) == 0:
+            return
         full_item_list = fourc_input.pop(section_name, [])
         full_item_list.extend(dictionary_list)
         fourc_input.combine_sections({section_name: full_item_list})
@@ -401,7 +410,7 @@ def dump_mesh_representation_to_input_file_legacy(
             mesh_representation.data_iterator("cell_data", "material_id"),
         )
     ):
-        element_type_data = element_type_id_to_data[element_type_id]
+        element_type_data = element_type_id_to_data[int(element_type_id)]
 
         node_ordering = _INPUT_FILE_MAPPINGS[
             "four_c_cell_to_connectivity_mapping_from_vtk"
@@ -438,7 +447,7 @@ def dump_mesh_representation_to_input_file_legacy(
             }
 
         element_list.append(
-            element_type_data.get_legacy_dict(
+            element_type_data.get_yaml_dict(
                 element_id=start_index_elements + i_element,
                 connectivity=start_index_nodes + connectivity,
                 element_material_id=element_material_id,
@@ -484,3 +493,183 @@ def dump_mesh_representation_to_input_file_legacy(
             ],
             geometry_set_list,
         )
+
+
+def dump_mesh_representation_to_input_file_vtu(
+    fourc_input: _FourCInput,
+    mesh_representation: _MeshRepresentation,
+    element_type_id_to_data: dict[int, _FourCElementData],
+) -> _pv.UnstructuredGrid:
+    """Dump the input file to a vtu mesh data format.
+
+    This function does two things:
+        - Create the vtu file containing the mesh information from the mesh
+          representation.
+        - Dump the information required for a vtu mesh format to the FourCIPP
+          input file.
+
+    Args:
+        fourc_input: FourCIPP input file where the mesh information data will be
+            dumped to.
+        mesh_representation: The mesh representation that is added to the input file.
+        element_type_id_to_data: The mapping between element type ID and the element
+            type data.
+
+    Returns:
+        The unstructured grid containing the vtu mesh.
+    """
+
+    # VTU output can not be combined with yaml output.
+    n_yaml_nodes = len(fourc_input.sections.get("NODE COORDS", []))
+    n_yaml_elements = sum(
+        len(fourc_input.sections.get(section, []))
+        for section in ("FLUID ELEMENTS", "STRUCTURE ELEMENTS")
+    )
+    if n_yaml_nodes > 0 or n_yaml_elements > 0:
+        raise ValueError(
+            "Mesh output in `vtu` format is not possible if there are yaml nodes or "
+            "elements in the input file."
+        )
+
+    # VTU output can not be combined with existing STRUCTURE GEOMETRY section.
+    if "STRUCTURE GEOMETRY" in fourc_input:
+        raise ValueError(
+            "Mesh output in `vtu` format is not possible if there is already a "
+            "STRUCTURE GEOMETRY section in the input file."
+        )
+
+    # Get a pyvista grid representing the mesh representation
+    grid = _pv.UnstructuredGrid(
+        mesh_representation.cell_connectivity,
+        mesh_representation.cell_types,
+        mesh_representation.points,
+    )
+
+    # Check which element types need triads.
+    element_type_ids_with_triads: set[int] = set()
+    triad_n_nodes: set[int] = set()
+    requires_triads = _INPUT_FILE_MAPPINGS["four_c_type_to_requires_triads"]
+    cell_to_type_and_n_nodes = _INPUT_FILE_MAPPINGS[
+        "four_c_cell_to_element_type_and_n_nodes"
+    ]
+    for (
+        i_element_type,
+        element_data,
+    ) in element_type_id_to_data.items():
+        if requires_triads.get(element_data.four_c_type, False):
+            n_nodes = cell_to_type_and_n_nodes[element_data.four_c_cell][1]
+            element_type_ids_with_triads.add(i_element_type)
+            triad_n_nodes.add(n_nodes)
+
+    # Get the indices of the elements where we need triad information.
+    triad_info_indices = _np.flatnonzero(
+        _np.isin(
+            mesh_representation.cell_data["element_type_id"],
+            list(element_type_ids_with_triads),
+        )
+    )
+
+    # Extract the triad information for each element where we need it.
+    rotation_vectors = mesh_representation.point_data["rotation_vector"]
+    element_rotation_vectors = {
+        n_nodes: _np.zeros((mesh_representation.n_cells, 3 * n_nodes))
+        for n_nodes in triad_n_nodes
+    }
+    beam_connectivity_mapping = _INPUT_FILE_MAPPINGS["beam_vtk_mapping_to_four_c"]
+    for i_element, connectivity in zip(
+        triad_info_indices,
+        mesh_representation.connectivity_iterator(element_indices=triad_info_indices),
+    ):
+        # The order of the element rotation vectors has to be consistent with the
+        # connectivity in 4C, not the one we write to vtu. Thus, we have to reorder
+        # the connectivity here.
+        n_nodes = len(connectivity)
+        element_rotation_vectors[n_nodes][i_element] = rotation_vectors[
+            connectivity[beam_connectivity_mapping[n_nodes]]
+        ].ravel()
+    for n_nodes, element_rotation_vector in element_rotation_vectors.items():
+        grid.cell_data[f"element_rotation_vector_{n_nodes}"] = element_rotation_vector
+
+    # Get the block IDs for each cell (elements with the same material and element data are in the same block).
+    element_type_and_material_to_block_id: dict[tuple[int, int], int] = {}
+    cell_block_id = _np.empty(mesh_representation.n_cells, dtype=int)
+    for i_cell, (element_type_id, material_id) in enumerate(
+        zip(
+            mesh_representation.data_iterator("cell_data", "element_type_id"),
+            mesh_representation.data_iterator("cell_data", "material_id"),
+        )
+    ):
+        key = (int(element_type_id), int(material_id))
+        if key not in element_type_and_material_to_block_id:
+            element_type_and_material_to_block_id[key] = len(
+                element_type_and_material_to_block_id
+            )
+        cell_block_id[i_cell] = element_type_and_material_to_block_id[key]
+    grid.cell_data["block_id"] = cell_block_id
+
+    # Add the element blocks to the input file.
+    cell_block_id_to_element_type_and_material = _create_inverse_mapping(
+        element_type_and_material_to_block_id
+    )
+    element_blocks = []
+    for i_block in sorted(cell_block_id_to_element_type_and_material.keys()):
+        element_type_id, material_id = cell_block_id_to_element_type_and_material[
+            i_block
+        ]
+        element_data = element_type_id_to_data[element_type_id]
+        additional_data = None
+        has_triads = requires_triads.get(element_data.four_c_type, False)
+        if has_triads:
+            n_nodes = cell_to_type_and_n_nodes[element_data.four_c_cell][1]
+            additional_data = {
+                "NODAL_ROTATION_VECTORS": (f"element_rotation_vector_{n_nodes}")
+            }
+        element_blocks.append(
+            element_data.get_block_dict(i_block, material_id, additional_data)
+        )
+    fourc_input.combine_sections(
+        {
+            "STRUCTURE GEOMETRY": {
+                "FILE": "TO_BE_DEFINED",
+                "SHOW_INFO": "detailed_summary",
+                "ELEMENT_BLOCKS": element_blocks,
+            }
+        }
+    )
+
+    # Add point sets from the mesh representation to the VTU grid.
+    geometry_sets_in_mr: dict[int, _GeometrySetInfo] = {}
+    for name, values in mesh_representation.point_data.items():
+        geometry_set_info = _string_to_geometry_set_info(name)
+        if geometry_set_info is not None:
+            geometry_set_id = geometry_set_info.i_global
+            geometry_sets_in_mr[geometry_set_id] = geometry_set_info
+            if geometry_set_info.name is not None:
+                data_array_name = geometry_set_info.name
+            else:
+                data_array_name = f"point_set_{geometry_set_id}"
+            if data_array_name in grid.point_data:
+                raise ValueError(
+                    f"Data array name {data_array_name} for geometry set {geometry_set_id} "
+                    "already exists in the VTU grid. Please ensure that the geometry set names "
+                    "in the mesh representation do not conflict with existing data array names."
+                )
+            grid.point_data[data_array_name] = values
+
+    # Boundary conditions must reference geometry sets stored in the VTU file.
+    known_bc_sections = _INPUT_FILE_MAPPINGS["known_boundary_condition_sections"]
+    for section in list(fourc_input.sections):
+        if section in known_bc_sections:
+            boundary_conditions = fourc_input.pop(section)
+            for boundary_condition in boundary_conditions:
+                geometry_set_id = boundary_condition.pop("E") - 1
+                geometry_set_info = geometry_sets_in_mr[geometry_set_id]
+                if geometry_set_info.name is not None:
+                    boundary_condition["NODE_SET_NAME"] = geometry_set_info.name
+                else:
+                    boundary_condition["E"] = geometry_set_id
+                    boundary_condition["ENTITY_TYPE"] = "node_set_id"
+            fourc_input.combine_sections({section: boundary_conditions})
+
+    # Return the vtu grid.
+    return grid

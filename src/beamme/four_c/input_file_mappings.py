@@ -24,6 +24,7 @@ files."""
 
 from typing import Any as _Any
 
+import numpy as _np
 import pyvista as _pv
 
 from beamme.core.conf import bme as _bme
@@ -84,11 +85,17 @@ INPUT_FILE_MAPPINGS["four_c_cell_to_vtk_connectivity_mapping"] = {
         "element_type_and_n_nodes_to_connectivity_mapping_vtk_to_beamme"
     ][(_bme.element_type.solid, 27)],
 }
+INPUT_FILE_MAPPINGS["beam_vtk_mapping_to_four_c"] = {
+    2: _np.array([0, 1]),
+    3: _np.array([0, 2, 1]),
+    4: _np.array([0, 3, 1, 2]),
+    5: _np.array([0, 4, 1, 2, 3]),
+}
 INPUT_FILE_MAPPINGS["four_c_cell_to_connectivity_mapping_from_vtk"] = {
     # Only list the non-standard mappings
-    "LINE3": [0, 2, 1],
-    "LINE4": [0, 3, 1, 2],
-    "LINE5": [0, 4, 1, 2, 3],
+    "LINE3": INPUT_FILE_MAPPINGS["beam_vtk_mapping_to_four_c"][3],
+    "LINE4": INPUT_FILE_MAPPINGS["beam_vtk_mapping_to_four_c"][4],
+    "LINE5": INPUT_FILE_MAPPINGS["beam_vtk_mapping_to_four_c"][5],
     "HEX20": _MESH_REPRESENTATION_MAPPINGS[
         "element_type_and_n_nodes_to_connectivity_mapping_beamme_to_vtk"
     ][(_bme.element_type.solid, 20)],
@@ -161,6 +168,14 @@ INPUT_FILE_MAPPINGS["boundary_conditions"] = {
         _bme.geo.surface,
     ): "DESIGN SURF MORTAR CONTACT CONDITIONS 3D",
 }
+# The definition of boundary conditions in 4C depends on the type of mesh output
+# (e.g., yaml or external mesh). When the actual input file is dumped, the correct
+# definition for geometry sets has to be used. BeamMe does not know all possible
+# boundary condition sections in advance, therefore, we store all used boundary
+# condition sections here, so we can check against them when dumping the input file.
+INPUT_FILE_MAPPINGS["known_boundary_condition_sections"] = set(
+    INPUT_FILE_MAPPINGS["boundary_conditions"].values()
+)
 INPUT_FILE_MAPPINGS["geometry_sets_geometry_to_condition_name"] = {
     _bme.geo.point: "DNODE-NODE TOPOLOGY",
     _bme.geo.line: "DLINE-NODE TOPOLOGY",
