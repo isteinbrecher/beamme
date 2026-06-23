@@ -22,11 +22,8 @@
 """Convert a beam to a space time surface mesh."""
 
 from typing import Callable as _Callable
-from typing import Dict as _Dict
-from typing import List as _List
 from typing import Tuple as _Tuple
 from typing import Type as _Type
-from typing import cast as _cast
 
 import numpy as _np
 import pyvista as _pv
@@ -36,13 +33,15 @@ from beamme.core.coupling import Coupling as _Coupling
 from beamme.core.element_volume import VolumeElement as _VolumeElement
 from beamme.core.geometry_set import GeometryName as _GeometryName
 from beamme.core.geometry_set import GeometrySet as _GeometrySet
+from beamme.core.geometry_set import GeometrySetBase as _GeometrySetBase
 from beamme.core.geometry_set import GeometrySetNodes as _GeometrySetNodes
 from beamme.core.mesh import Mesh as _Mesh
+from beamme.core.mesh_representation import MeshRepresentation as _MeshRepresentation
 from beamme.core.mesh_utils import (
-    get_coupled_nodes_to_master_map as _get_coupled_nodes_to_master_map,
+    apply_nodal_coupling_to_mesh_representation as _apply_nodal_coupling_to_mesh_representation,
 )
+from beamme.core.node import Node as _Node
 from beamme.core.node import NodeCosserat as _NodeCosserat
-from beamme.utils.nodes import get_nodal_coordinates as _get_nodal_coordinates
 
 
 class NodeCosseratSpaceTime(_NodeCosserat):
@@ -68,13 +67,17 @@ class SpaceTimeElement(_VolumeElement):
 class SpaceTimeElementQuad4(SpaceTimeElement):
     """A space-time element with 4 nodes."""
 
+    element_type = _bme.element_type.space_time_beam
     vtk_cell_type = _pv.CellType.QUAD
+    data = {}
 
 
 class SpaceTimeElementQuad9(SpaceTimeElement):
     """A space-time element with 9 nodes."""
 
+    element_type = _bme.element_type.space_time_beam
     vtk_cell_type = _pv.CellType.BIQUADRATIC_QUAD
+    data = {}
 
 
 def beam_to_space_time(
@@ -105,7 +108,7 @@ def beam_to_space_time(
             might lead to unexpected results.
         - return_set:
             The nodes sets to be returned for the space time mesh:
-                "start", "end", "left", "right", "surface"
+                "start", "end", "surface"
     """
 
     # Get the "reference" spatial mesh
@@ -138,14 +141,16 @@ def beam_to_space_time(
     else:
         raise TypeError(f"Got unexpected element type {element_type}")
 
-    # Number the nodes in the original mesh
+    # Number nodes and elements in the original mesh
     for i_node, node in enumerate(mesh_space_reference.nodes):
         node.i_global = i_node
+    for i_element, element in enumerate(mesh_space_reference.elements):
+        element.i_global = i_element
 
     # Get the nodes for the final space-time mesh
-    left_nodes = []
-    right_nodes = []
     space_time_nodes = []
+    start_nodes: list[_Node] = []
+    end_nodes: list[_Node] = []
     for i_mesh_space in range(number_of_copies_in_time):
         time = time_increment_between_nodes * i_mesh_space + time_start
 
@@ -170,12 +175,9 @@ def beam_to_space_time(
         space_time_nodes.extend(space_time_nodes_to_add)
 
         if i_mesh_space == 0:
-            start_nodes = space_time_nodes_to_add
+            start_nodes.extend(space_time_nodes_to_add)
         elif i_mesh_space == number_of_copies_in_time - 1:
-            end_nodes = space_time_nodes_to_add
-
-        left_nodes.append(space_time_nodes_to_add[0])
-        right_nodes.append(space_time_nodes_to_add[-1])
+            end_nodes.extend(space_time_nodes_to_add)
 
     # Create the space time elements
     space_time_elements = []
@@ -230,12 +232,13 @@ def beam_to_space_time(
 
     # Add joints to the space time mesh
     space_time_couplings = []
+    coupling_geometry_sets = set()
     for coupling in mesh_space_reference.boundary_conditions[
         _bme.bc.point_coupling, _bme.geo.point
     ]:
-        coupling_node_ids = [
-            node.i_global for node in coupling.geometry_set.get_points()
-        ]
+        coupling_set = coupling.geometry_set
+        coupling_geometry_sets.add(coupling_set)
+        coupling_node_ids = [node.i_global for node in coupling_set.get_points()]
         for i_mesh_space in range(number_of_copies_in_time):
             space_time_couplings.append(
                 _Coupling(
@@ -250,25 +253,90 @@ def beam_to_space_time(
                 )
             )
 
+    # Convert geometry sets to the space time mesh
+    raise_geometry_type = {
+        _bme.geo.point: _bme.geo.line,
+        _bme.geo.line: _bme.geo.surface,
+        _bme.geo.surface: _bme.geo.volume,
+    }
+    all_sets_in_space = mesh_space_reference.get_unique_geometry_sets()
+    space_time_geometry_sets: list[_GeometrySetBase] = []
+    for geometry_type, geometry_sets in all_sets_in_space.items():
+        for geometry_set in geometry_sets:
+            if geometry_set in coupling_geometry_sets:
+                # The coupling geometry sets are already handled above, so we skip them here.
+                continue
+
+            if isinstance(geometry_set, _GeometrySet) and (
+                geometry_type == _bme.geo.line
+                or geometry_type == _bme.geo.surface
+                or geometry_type == _bme.geo.volume
+            ):
+                raised_geometry_set_elements = []
+                for element in geometry_set.get_geometry_objects():
+                    for i_element_row_in_time in range(number_of_elements_in_time):
+                        raised_geometry_set_elements.append(
+                            space_time_elements[
+                                element.i_global
+                                + i_element_row_in_time * number_of_elements_in_space
+                            ]
+                        )
+                space_time_geometry_sets.append(
+                    _GeometrySet(
+                        raised_geometry_set_elements,
+                        name=geometry_set.name,
+                    )
+                )
+
+            else:
+                geometry_set_nodes = geometry_set.get_all_nodes()
+                raised_geometry_set_nodes = []
+                for node in geometry_set_nodes:
+                    for i_mesh_space in range(number_of_copies_in_time):
+                        raised_geometry_set_nodes.append(
+                            space_time_nodes[
+                                node.i_global + i_mesh_space * number_of_nodes_in_space
+                            ]
+                        )
+
+                geometry_type_raised = raise_geometry_type[geometry_type]
+                space_time_geometry_sets.append(
+                    _GeometrySetNodes(
+                        geometry_type_raised,
+                        raised_geometry_set_nodes,
+                        name=geometry_set.name,
+                    )
+                )
+
     # Create the new mesh and add all the mesh items
     space_time_mesh = _Mesh()
     space_time_mesh.add(space_time_nodes)
     space_time_mesh.add(space_time_elements)
     space_time_mesh.add(space_time_couplings)
+    space_time_mesh.add(space_time_geometry_sets)
 
     # Create the element sets
     return_set = _GeometryName()
-    return_set["start"] = _GeometrySet(start_nodes)
-    return_set["end"] = _GeometrySet(end_nodes)
-    return_set["left"] = _GeometrySet(left_nodes)
-    return_set["right"] = _GeometrySet(right_nodes)
+    return_set["start"] = _GeometrySetNodes(_bme.geo.line, start_nodes)
+    return_set["end"] = _GeometrySetNodes(_bme.geo.line, end_nodes)
     return_set["surface"] = _GeometrySetNodes(_bme.geo.surface, space_time_mesh.nodes)
 
     return space_time_mesh, return_set
 
 
-def mesh_to_data_arrays(mesh: _Mesh):
-    """Get the relevant data arrays from the space time mesh."""
+def get_space_time_mesh_representation(mesh: _Mesh) -> _MeshRepresentation:
+    """Get the mesh representation for the space time mesh.
+
+    Compared to the standard mesh representation, coupled nodes are represented by the
+    same node. This requires some additional element data arrays which are added by
+    this function.
+
+    Args:
+        mesh: The space time mesh.
+
+    Returns:
+        The mesh representation for the space time mesh.
+    """
 
     element_types = list(set([type(element) for element in mesh.elements]))
     if len(element_types) > 1:
@@ -281,62 +349,47 @@ def mesh_to_data_arrays(mesh: _Mesh):
             f"Expected either SpaceTimeElementQuad4 or SpaceTimeElementQuad9, got {element_types[0]}"
         )
 
-    _, unique_nodes = _get_coupled_nodes_to_master_map(mesh, assign_i_global=True)
-
-    n_nodes = len(unique_nodes)
-    n_elements = len(mesh.elements)
+    # Number of nodes per element
     n_nodes_per_element = len(mesh.elements[0].nodes)
 
-    coordinates = _get_nodal_coordinates(unique_nodes)
-    time = _np.zeros(n_nodes)
-    connectivity = _np.zeros((n_elements, n_nodes_per_element), dtype=int)
-    element_rotation_vectors = _np.zeros((n_elements, n_nodes_per_element, 3))
+    # Get the mesh representation
+    (mesh_representation, _, geometry_sets_to_i_global, _) = (
+        mesh.get_mesh_representation()
+    )
 
-    unique_nodes_casted_space_time = _cast(_List[NodeCosseratSpaceTime], unique_nodes)
-    for i_node, node in enumerate(unique_nodes_casted_space_time):
-        time[i_node] = node.time
-
-    for i_element, element in enumerate(mesh.elements):
-        for i_node, node in enumerate(element.nodes):
-            connectivity[i_element, i_node] = node.i_global
-            element_rotation_vectors[i_element, i_node, :] = (
-                node.rotation.get_rotation_vector()
-            )
-
-    geometry_sets = mesh.get_unique_geometry_sets()
-    node_sets: _Dict[str, _Dict] = {}
-    for value in geometry_sets.values():
-        for geometry_set in value:
-            node_ids = sorted(
-                list(set(node.i_global for node in geometry_set.get_all_nodes()))
-            )
-            node_set_data = {"node_ids": node_ids}
-            if geometry_set.name is not None:
-                node_set_data["name"] = geometry_set.name
-            node_sets[str(len(node_sets) + 1)] = node_set_data
-
-    return_dict = {
-        "coordinates": coordinates,
-        "time": time,
-        "connectivity": connectivity,
-        "element_rotation_vectors": element_rotation_vectors,
-        "node_sets": node_sets,
-    }
-
-    nodes_have_arc_length = {node.arc_length is not None for node in mesh.nodes}
-    if len(nodes_have_arc_length) > 1:
-        raise ValueError(
-            "Some nodes have an arc length, some don't. This is not supported."
+    # Get the element rotation vectors and arc length values. This has to be done before
+    # the coupled nodes are removed.
+    point_rotation_vectors = mesh_representation.point_data["rotation_vector"]
+    element_rotation_vectors = _np.zeros(
+        (mesh_representation.n_cells, n_nodes_per_element * 3)
+    )
+    element_arc_lengths = None
+    if "arc_length" in mesh_representation.point_data:
+        point_arc_lengths = mesh_representation.point_data["arc_length"]
+        element_arc_lengths = _np.zeros(
+            (mesh_representation.n_cells, n_nodes_per_element)
         )
-    if nodes_have_arc_length.pop():
-        # The arc length is added as an "element" property, since the same
-        # node can have a different arc length depending on the element
-        # (similar to the rotation vectors).
-        arc_length = _np.zeros((n_elements, n_nodes_per_element))
-        for i_element, element in enumerate(mesh.elements):
-            for i_node, node in enumerate(element.nodes):
-                connectivity[i_element, i_node] = node.i_global
-                arc_length[i_element, i_node] = node.arc_length
-        return_dict["arc_length"] = arc_length
 
-    return return_dict
+    for i_element, connectivity in enumerate(
+        mesh_representation.connectivity_iterator()
+    ):
+        for i_local, i_global in enumerate(connectivity):
+            element_rotation_vectors[i_element, i_local * 3 : (i_local + 1) * 3] = (
+                point_rotation_vectors[i_global]
+            )
+            if element_arc_lengths is not None:
+                element_arc_lengths[i_element, i_local] = point_arc_lengths[i_global]
+
+    # Add the element data arrays
+    mesh_representation.cell_data["rotation_vector"] = element_rotation_vectors
+    if element_arc_lengths is not None:
+        mesh_representation.cell_data["arc_length"] = element_arc_lengths
+
+    # Apply the coupling by explicitly replacing the coupled nodes.
+    _apply_nodal_coupling_to_mesh_representation(
+        mesh_representation,
+        geometry_sets_to_i_global,
+        mesh.boundary_conditions[_bme.bc.point_coupling, _bme.geo.point],
+    )
+
+    return mesh_representation
