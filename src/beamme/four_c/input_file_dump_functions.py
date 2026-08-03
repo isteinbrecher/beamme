@@ -45,7 +45,9 @@ from beamme.core.mesh_representation import (
 from beamme.core.mesh_representation import (
     string_to_geometry_set_info as _string_to_geometry_set_info,
 )
-from beamme.core.nurbs_patch import NURBSPatch as _NURBSPatch
+from beamme.core.mesh_representation import (
+    string_to_nurbs_patch_id_and_field_name as _string_to_nurbs_patch_id_and_field_name,
+)
 from beamme.core.rotation import Rotation as _Rotation
 from beamme.four_c.boundary_condition_data import (
     FourCBoundaryConditionData as _FourCBoundaryConditionData,
@@ -109,54 +111,83 @@ def dump_coupling(coupling):
     return data
 
 
-def dump_nurbs_patch_knotvectors(input_file, nurbs_patch: _NURBSPatch) -> None:
-    """Set the knot vectors of the NURBS patch in the input file."""
-    patch_data: dict[str, _Any] = {
-        "KNOT_VECTORS": [],
-    }
+def dump_nurbs_patch_information(
+    fourc_input: _FourCInput, mesh_representation: _MeshRepresentation
+) -> None:
+    """Dump the NURBS patch information from the mesh representation to the 4C input
+    file."""
+    # Get the patch information from field data
+    nurbs_patch_information: dict[int, dict[str, _Any]] = _defaultdict(dict)
+    for key, value in mesh_representation.field_data.items():
+        if key.startswith("nurbs_patch_"):
+            split = key.split("_", 3)
+            patch_id = int(split[2])
+            patch_info_name = split[3]
+            nurbs_patch_information[patch_id][patch_info_name] = value
 
-    for dir_manifold in range(nurbs_patch.get_nurbs_dimension()):
-        knotvector = nurbs_patch.knot_vectors[dir_manifold]
-        num_knots = len(knotvector)
+    if len(nurbs_patch_information) == 0:
+        # There are no NURBS in the mesh, so there is nothing to do here.
+        return
 
-        # Check the type of knot vector, in case that the multiplicity of the first and last
-        # knot vectors is not p + 1, then it is a closed (periodic) knot vector, otherwise it
-        # is an open (interpolated) knot vector.
-        knotvector_type = "Interpolated"
+    # Get the correct knot vectors from the flatted arrays.
+    for value in nurbs_patch_information.values():
+        knot_vectors_size = value["knot_vectors_size"]
+        knot_vectors_flat = value["knot_vectors_flat"]
 
-        for i in range(nurbs_patch.polynomial_orders[dir_manifold] - 1):
-            if (abs(knotvector[i] - knotvector[i + 1]) > _bme.eps_knot_vector) or (
-                abs(knotvector[num_knots - 2 - i] - knotvector[num_knots - 1 - i])
-                > _bme.eps_knot_vector
-            ):
-                knotvector_type = "Periodic"
-                break
+        knot_vectors = []
+        start = 0
+        for length in knot_vectors_size:
+            knot_vectors.append(knot_vectors_flat[start : start + length])
+            start += length
+        value["knot_vectors"] = knot_vectors
 
-        patch_data["KNOT_VECTORS"].append(
-            {
-                "DEGREE": nurbs_patch.polynomial_orders[dir_manifold],
-                "TYPE": knotvector_type,
-                "KNOTS": [
-                    knot_vector_val
-                    for knot_vector_val in nurbs_patch.knot_vectors[dir_manifold]
-                ],
-            }
-        )
-
-    if "STRUCTURE KNOTVECTORS" in input_file:
+    if "STRUCTURE KNOTVECTORS" in fourc_input:
         # Get all existing patches in the input file - they will be added to the
         # input file again at the end of this function. By doing it this way, the
         # FourCIPP type converter will be applied to the current patch.
         # This also means that we apply the type converter again already existing
         # patches. But, with the usual number of patches and data size, this
         # should not lead to a measurable performance impact.
-        patches = input_file.pop("STRUCTURE KNOTVECTORS")["PATCHES"]
+        patches = fourc_input.pop("STRUCTURE KNOTVECTORS")["PATCHES"]
     else:
         patches = []
 
-    patch_data["ID"] = nurbs_patch
-    patches.append(patch_data)
-    input_file.add({"STRUCTURE KNOTVECTORS": {"PATCHES": patches}})
+    for patch_id in sorted(nurbs_patch_information.keys()):
+        patch_data: dict[str, _Any] = {"KNOT_VECTORS": []}
+        patch_information = nurbs_patch_information[patch_id]
+
+        polynomial_orders = patch_information["polynomial_orders"]
+        knotvectors = patch_information["knot_vectors"]
+        for dir_manifold in range(len(polynomial_orders)):
+            knotvector = knotvectors[dir_manifold]
+            num_knots = len(knotvector)
+
+            # Check the type of knot vector, in case that the multiplicity of the first and last
+            # knot vectors is not p + 1, then it is a closed (periodic) knot vector, otherwise it
+            # is an open (interpolated) knot vector.
+            knotvector_type = "Interpolated"
+
+            for i in range(polynomial_orders[dir_manifold] - 1):
+                if (abs(knotvector[i] - knotvector[i + 1]) > _bme.eps_knot_vector) or (
+                    abs(knotvector[num_knots - 2 - i] - knotvector[num_knots - 1 - i])
+                    > _bme.eps_knot_vector
+                ):
+                    knotvector_type = "Periodic"
+                    break
+
+            patch_data["KNOT_VECTORS"].append(
+                {
+                    "DEGREE": polynomial_orders[dir_manifold],
+                    "TYPE": knotvector_type,
+                    "KNOTS": [knot_vector_val for knot_vector_val in knotvector],
+                }
+            )
+
+        patch_data["ID"] = patch_id + 1
+        patches.append(patch_data)
+
+    # Add all patch information to the input file.
+    fourc_input.combine_sections({"STRUCTURE KNOTVECTORS": {"PATCHES": patches}})
 
 
 def dump_mesh_to_input_file(input_file, mesh: _Mesh) -> None:
@@ -175,10 +206,12 @@ def dump_mesh_to_input_file(input_file, mesh: _Mesh) -> None:
     start_index_element_types = len(input_file.element_type_id_to_data)
 
     # Compute starting index for NURBS patches
-    nurbs_patches = input_file.sections.get("STRUCTURE KNOTVECTORS", {}).get(
-        "PATCHES", []
-    )
-    start_index_nurbs_patches = len(nurbs_patches)
+    start_index_nurbs_patches = -1
+    for name in input_file.mesh_representation.field_data.keys():
+        patch_info = _string_to_nurbs_patch_id_and_field_name(name)
+        if patch_info is not None:
+            start_index_nurbs_patches = max(start_index_nurbs_patches, patch_info[0])
+    start_index_nurbs_patches += 1
 
     # Compute starting index for geometry sets
     start_index_geometry_set = max(
@@ -216,16 +249,14 @@ def dump_mesh_to_input_file(input_file, mesh: _Mesh) -> None:
     material_to_i_global = _get_material_to_i_global_mapping(mesh.materials)
 
     # Get the mesh representation for the mesh.
-    (
-        mesh_representation,
-        mesh_element_type_id_to_data,
-        geometry_sets_to_i_global,
-        nurbs_patch_to_i_global,
-    ) = mesh.get_mesh_representation(material_to_i_global)
+    (mesh_representation, mesh_element_type_id_to_data, geometry_sets_to_i_global) = (
+        mesh.get_mesh_representation(material_to_i_global)
+    )
     mesh_representation.offset_indices(
         element_type_id_offset=start_index_element_types,
         material_offset=start_index_materials,
         geometry_set_offset=start_index_geometry_set,
+        nurbs_patch_offset=start_index_nurbs_patches,
     )
 
     # Add the new element types to the mapping in the input file.
@@ -256,10 +287,6 @@ def dump_mesh_to_input_file(input_file, mesh: _Mesh) -> None:
     input_file.fourc_input.type_converter.register_type(
         _Material,
         lambda _, obj: material_to_i_global[obj] + 1 + start_index_materials,
-    )
-    input_file.fourc_input.type_converter.register_type(
-        _NURBSPatch,
-        lambda _, obj: nurbs_patch_to_i_global[obj] + 1 + start_index_nurbs_patches,
     )
 
     def _dump(section_name: str, items: list | _KeysView) -> None:
@@ -340,11 +367,6 @@ def dump_mesh_to_input_file(input_file, mesh: _Mesh) -> None:
     # If we have previously set the node links, we unlink them here.
     if is_linked_nodes:
         mesh.unlink_nodes()
-
-    # Dump NURBS patch information.
-    for element in mesh.elements:
-        if isinstance(element, _NURBSPatch):
-            dump_nurbs_patch_knotvectors(input_file, element)
 
 
 def dump_mesh_representation_to_input_file_yaml(
@@ -470,6 +492,9 @@ def dump_mesh_representation_to_input_file_yaml(
             )
         )
     _dump("STRUCTURE ELEMENTS", element_list)
+
+    # Dump NURBS patch information.
+    dump_nurbs_patch_information(fourc_input, mesh_representation)
 
     # Dump geometry sets to the input file.
     # We first create a mapping from the geometry type to a dictionary which maps

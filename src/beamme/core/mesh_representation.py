@@ -73,6 +73,7 @@ MESH_REPRESENTATION_MAPPINGS["connectivity_mapping_exodus_to_vtk"] = {
 
 
 GEOMETRY_SET_INFO_PREFIX = "geometry_set"
+NURBS_PATCH_INFO_PREFIX = "nurbs_patch"
 
 
 @_dataclass
@@ -110,6 +111,23 @@ def string_to_geometry_set_info(name: str) -> GeometrySetInfo | None:
     )
 
 
+def nurbs_patch_id_to_string(patch_id: int) -> str:
+    """Convert a NURBS patch ID to a string that can be used as a field data name."""
+    return f"{NURBS_PATCH_INFO_PREFIX}_{patch_id}"
+
+
+def string_to_nurbs_patch_id_and_field_name(name: str) -> tuple[int, str] | None:
+    """Extract the NURBS patch ID and field name from a given string."""
+    if not name.startswith(NURBS_PATCH_INFO_PREFIX):
+        return None
+
+    name_without_prefix = name[len(NURBS_PATCH_INFO_PREFIX) + 1 :]
+    split = name_without_prefix.split("_", 1)
+    patch_id = int(split[0])
+    field_name = split[1]
+    return patch_id, field_name
+
+
 class MeshRepresentation:
     """Class representing a generic mesh."""
 
@@ -121,6 +139,7 @@ class MeshRepresentation:
         geometry_sets: list[GeometrySetInfo] | None = None,
         cell_data: dict[str, _NDArray | None] | None = None,
         point_data: dict[str, _NDArray | None] | None = None,
+        field_data: dict[str, _NDArray | None] | None = None,
     ):
         def _convert_argument_numpy(
             argument: _NDArray | None,
@@ -134,7 +153,7 @@ class MeshRepresentation:
                 return _np.asarray(argument, dtype=dtype)
 
         def _filter_none_entries(
-            argument: dict[str, _NDArray | None] | None, expected_size: int
+            argument: dict[str, _NDArray | None] | None, expected_size: int | None
         ) -> dict[str, _NDArray]:
             """Check if a dictionary is given, and if so, filter None entries from
             it."""
@@ -147,10 +166,11 @@ class MeshRepresentation:
                     if value is not None
                 }
                 for key, value in data.items():
-                    if len(value) != expected_size:
-                        raise ValueError(
-                            f"Data field {key} has size {len(value)}, but expected size is {expected_size}."
-                        )
+                    if expected_size is not None:
+                        if len(value) != expected_size:
+                            raise ValueError(
+                                f"Data field {key} has size {len(value)}, but expected size is {expected_size}."
+                            )
                 return data
 
         self.cell_connectivity = _convert_argument_numpy(
@@ -163,6 +183,7 @@ class MeshRepresentation:
 
         self.cell_data = _filter_none_entries(cell_data, self.n_cells)
         self.point_data = _filter_none_entries(point_data, self.n_points)
+        self.field_data = _filter_none_entries(field_data, None)
 
         def _store_geometry_set_data(
             data_field: str,
@@ -284,6 +305,7 @@ class MeshRepresentation:
         element_type_id_offset: int | None = None,
         material_offset: int | None = None,
         geometry_set_offset: int | None = None,
+        nurbs_patch_offset: int | None = None,
     ) -> None:
         """Add offsets to the internal indices of this mesh representation.
 
@@ -294,6 +316,7 @@ class MeshRepresentation:
             element_type_id_offset: The offset to add to the element type IDs.
             material_offset: The offset to add to the material IDs.
             geometry_set_offset: The offset to add to the geometry set IDs.
+            nurbs_patch_offset: The offset to add to the NURBS patch IDs.
         """
         if element_type_id_offset is not None:
             if "element_type_id" in self.cell_data:
@@ -326,11 +349,23 @@ class MeshRepresentation:
                 # Add the renamed geometry sets back to the data field.
                 setattr(self, field_type, {**data_field, **new_dict})
 
+        if nurbs_patch_offset is not None:
+            new_dict = {}
+            for name, value in self.field_data.items():
+                nurbs_info = string_to_nurbs_patch_id_and_field_name(name)
+                if nurbs_info is not None:
+                    new_name = f"{nurbs_patch_id_to_string(nurbs_info[0] + nurbs_patch_offset)}_{nurbs_info[1]}"
+                    new_dict[new_name] = value
+                else:
+                    new_dict[name] = value
+            self.field_data = new_dict
+
     def get_pyvista_grid(
         self,
         *,
         cell_data_fields: bool | list[str] = False,
         point_data_fields: bool | list[str] = False,
+        field_data_fields: bool | list[str] = False,
         add_geometry_sets: bool = False,
     ) -> _pv.UnstructuredGrid:
         """Return a PyVista UnstructuredGrid representation of this mesh representation.
@@ -346,6 +381,11 @@ class MeshRepresentation:
                 is given, only those fields are added to the grid. If it is True, all
                 point data fields are added to the grid. If it is False, no point data
                 fields are added to the grid.
+            field_data_fields: The field data fields to add to the grid. This can be
+                either a list of field names, or a boolean. If a list of field names
+                is given, only those fields are added to the grid. If it is True, all
+                field data fields are added to the grid. If it is False, no field data
+                fields are added to the grid.
             add_geometry_sets: If this is True, all geometry set information is added to
                 the grid, even if it is not included in the cell_data_fields or
                 point_data_fields arguments.
@@ -360,9 +400,9 @@ class MeshRepresentation:
         )
 
         for names, mesh_representation_field, grid_field in zip(
-            (cell_data_fields, point_data_fields),
-            (self.cell_data, self.point_data),
-            (grid.cell_data, grid.point_data),
+            (cell_data_fields, point_data_fields, field_data_fields),
+            (self.cell_data, self.point_data, self.field_data),
+            (grid.cell_data, grid.point_data, grid.field_data),
         ):
             for name, data in mesh_representation_field.items():
                 add_field = False
@@ -372,6 +412,8 @@ class MeshRepresentation:
                     add_field = True
                 elif add_geometry_sets:
                     add_field = string_to_geometry_set_info(name) is not None
+                elif string_to_nurbs_patch_id_and_field_name(name) is not None:
+                    add_field = True
                 if add_field:
                     grid_field[name] = data
 
@@ -485,10 +527,29 @@ def merge_mesh_representations(
         mesh_representation_b.n_points,
     )
 
+    # Merge field data.
+    overlap = (
+        mesh_representation_a.field_data.keys()
+        & mesh_representation_b.field_data.keys()
+    )
+    if overlap:
+        raise ValueError(
+            "Duplicate field data keys are not supported! Got the following duplicate "
+            f"keys: {overlap}"
+        )
+    merged_field_data = {}
+    for field_data in [
+        mesh_representation_a.field_data,
+        mesh_representation_b.field_data,
+    ]:
+        for key, value in field_data.items():
+            merged_field_data[key] = value.copy()
+
     return MeshRepresentation(
         cell_connectivity=merged_cell_connectivity,
         cell_types=merged_cell_types,
         points=merged_points,
         cell_data=merged_cell_data,
         point_data=merged_point_data,
+        field_data=merged_field_data,
     )

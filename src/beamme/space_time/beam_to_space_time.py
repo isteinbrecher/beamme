@@ -350,9 +350,7 @@ def get_space_time_mesh_representation(mesh: _Mesh) -> _MeshRepresentation:
     n_nodes_per_element = len(mesh.elements[0].nodes)
 
     # Get the mesh representation
-    (mesh_representation, _, geometry_sets_to_i_global, _) = (
-        mesh.get_mesh_representation()
-    )
+    mesh_representation, _, geometry_sets_to_i_global = mesh.get_mesh_representation()
 
     # Get the element rotation vectors and arc length values. This has to be done before
     # the coupled nodes are removed.

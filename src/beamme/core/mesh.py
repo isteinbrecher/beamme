@@ -55,6 +55,9 @@ from beamme.core.mesh_representation import (
 )
 from beamme.core.mesh_representation import GeometrySetInfo as _GeometrySetInfo
 from beamme.core.mesh_representation import MeshRepresentation as _MeshRepresentation
+from beamme.core.mesh_representation import (
+    nurbs_patch_id_to_string as _nurbs_patch_id_to_string,
+)
 from beamme.core.node import Node as _Node
 from beamme.core.node import NodeCosserat as _NodeCosserat
 from beamme.core.nurbs_patch import NURBSPatch as _NURBSPatch
@@ -728,7 +731,6 @@ class Mesh:
         _MeshRepresentation,
         dict[int, _Any],
         dict[_GeometrySetBase, int],
-        dict[_NURBSPatch, int],
     ]:
         """Create a mesh representation for this mesh.
 
@@ -745,8 +747,6 @@ class Mesh:
                 data of the element type.
             geometry_sets_to_i_global: A dictionary that maps geometry sets to their
                 global index in the mesh representation.
-            nurbs_patch_to_i_global: A dictionary that maps each NURBS patch to the
-                global ID of that patch.
         """
         if material_to_i_global is None:
             material_to_i_global = {}
@@ -810,14 +810,24 @@ class Mesh:
         i_element = 0
         nurbs_count = 0
         nurbs_patch_to_i_global = {}
+        field_data = {}  # The NURBS information will be stored here.
         for element in self.elements:
             # Perform consistency checks for the element.
             element.check()
             element.i_global = i_element
             if isinstance(element, _NURBSPatch):
                 nurbs_patch_to_i_global[element] = nurbs_count
-                nurbs_count += 1
                 i_element += element.get_number_of_elements()
+
+                polynomial_orders, knot_vectors_flat, knot_vectors_size = (
+                    element.get_data_one_dimensional_arrays()
+                )
+                field_name_prefix = _nurbs_patch_id_to_string(nurbs_count)
+                field_data[f"{field_name_prefix}_polynomial_orders"] = polynomial_orders
+                field_data[f"{field_name_prefix}_knot_vectors_flat"] = knot_vectors_flat
+                field_data[f"{field_name_prefix}_knot_vectors_size"] = knot_vectors_size
+
+                nurbs_count += 1
             else:
                 i_element += 1
         n_elements = i_element
@@ -830,6 +840,7 @@ class Mesh:
         cell_types = _np.full(n_elements, -1)
         cell_element_type_ids = _np.full(n_elements, -1)
         cell_material_ids = _np.full(n_elements, -1)
+        cell_nurbs_patch_ids = None
         cell_beamme_element_ids = _np.full(n_elements, -1)
         for i_element_beamme, element in enumerate(self.elements):
             # Get the element type id for this element.
@@ -862,6 +873,13 @@ class Mesh:
                     ]
                     cell_connectivity.extend([len(connectivity), *connectivity])
 
+                # Set the ID of the NURBS patch for all elements of the patch.
+                if cell_nurbs_patch_ids is None:
+                    cell_nurbs_patch_ids = _np.full(n_elements, _np.nan, dtype=int)
+
+                cell_nurbs_patch_ids[data_assignment_slice] = nurbs_patch_to_i_global[
+                    element
+                ]
             else:
                 data_assignment_slice = element.i_global
 
@@ -938,6 +956,7 @@ class Mesh:
                 "element_type_id": cell_element_type_ids,
                 "material_id": cell_material_ids,
                 "beamme_id": cell_beamme_element_ids,
+                "nurbs_patch_id": cell_nurbs_patch_ids,
             },
             point_data={
                 "point_type": point_types,
@@ -946,14 +965,10 @@ class Mesh:
                 "rotation_vector": nodal_rotation_vectors,
                 "time": point_times,
             },
+            field_data=field_data,
         )
 
-        return (
-            mesh_representation,
-            element_type_id_to_data,
-            geometry_sets_to_i_global,
-            nurbs_patch_to_i_global,
-        )
+        return (mesh_representation, element_type_id_to_data, geometry_sets_to_i_global)
 
     def get_vtu_representation(self) -> _pv.UnstructuredGrid:
         """Return a vtu representation of this mesh.
@@ -962,7 +977,7 @@ class Mesh:
             A pyvista UnstructuredGrid object that represents this mesh.
         """
         # Get mesh representation.
-        mesh_representation, _, _, _ = self.get_mesh_representation()
+        mesh_representation, _, _ = self.get_mesh_representation()
 
         # Get the pyvista grid.
         grid = mesh_representation.get_pyvista_grid(

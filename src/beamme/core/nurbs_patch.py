@@ -74,9 +74,9 @@ class NURBSPatch(_Element):
         n_dim = len(self.knot_vectors)
         n_cp_per_dim = []
         for i_dim in range(n_dim):
-            knot_vector_size = len(self.knot_vectors[i_dim])
+            knot_vectors_size = len(self.knot_vectors[i_dim])
             polynomial_order = self.polynomial_orders[i_dim]
-            n_cp_per_dim.append(knot_vector_size - polynomial_order - 1)
+            n_cp_per_dim.append(knot_vectors_size - polynomial_order - 1)
         return n_cp_per_dim
 
     def get_non_empty_knot_span_indices(self) -> list[list[int]]:
@@ -114,6 +114,20 @@ class NURBSPatch(_Element):
         num_elements_dir = [len(indices) for indices in non_empty_knot_spans_indices]
         total_num_elements = _np.prod(num_elements_dir)
         return total_num_elements
+
+    def get_data_one_dimensional_arrays(self):
+        """Return the degrees and knot vector information as 1D arrays.
+
+        This is used to store the patch information in vtu field data which only supports 1D data arrays.
+
+        Returns:
+        """
+        knot_vectors_flat = []
+        knot_vector_shape = []
+        for knot_vector in self.knot_vectors:
+            knot_vectors_flat.extend(knot_vector)
+            knot_vector_shape.append(len(knot_vector))
+        return (self.polynomial_orders.copy(), knot_vectors_flat, knot_vector_shape)
 
     @_abstractmethod
     def get_knot_span_iterator(self) -> _Iterator[tuple[int, ...]]:
