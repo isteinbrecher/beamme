@@ -300,3 +300,54 @@ def test_integration_four_c_input_file_vtu_boundary_conditions_named_geometry_se
         input_file,
         four_c_input_file_data_format="vtu",
     )
+
+
+def test_integration_four_c_input_file_add_boundary_conditions_to_input_file(
+    get_default_test_beam_material,
+    get_bc_data,
+    get_corresponding_reference_file_path,
+    assert_results_close,
+):
+    """Test that boundary conditions referencing a geometry set of the mesh
+    representation can directly be added to the input file."""
+    mesh = Mesh()
+    mat = get_default_test_beam_material(material_type="reissner")
+    beam_set = create_beam_mesh(mesh, Beam3eb, mat)
+
+    # Name some of the geometry sets and add to the mesh
+    beam_set["start"].name = "beam_start"
+    mesh.add(beam_set["start"])
+    beam_set["line"].name = "beam_line"
+    mesh.add(beam_set["line"])
+
+    # Add one boundary condition already to the mesh
+    mesh.add(
+        BoundaryCondition(
+            beam_set["end"],
+            get_bc_data(identifier=2, num_dof=6),
+            bc_type=bme.bc.dirichlet,
+        )
+    )
+
+    # Add the mesh to the input file
+    input_file = InputFile()
+    input_file.add(mesh)
+
+    # Add boundary conditions directly to the mesh
+    input_file_geometry_sets = input_file.get_named_geometry_sets()
+    input_file.add(
+        BoundaryCondition(
+            input_file_geometry_sets["beam_start"],
+            get_bc_data(identifier=1, num_dof=6),
+            bc_type=bme.bc.dirichlet,
+        )
+    )
+    input_file.add(
+        BoundaryCondition(
+            input_file_geometry_sets["beam_line"],
+            get_bc_data(identifier=3, num_dof=6),
+            bc_type=bme.bc.neumann,
+        )
+    )
+
+    assert_results_close(get_corresponding_reference_file_path(), input_file)

@@ -375,6 +375,38 @@ def dump_mesh_to_input_file(input_file, mesh: _Mesh) -> None:
             dump_nurbs_patch_knotvectors(input_file, element)
 
 
+def dump_boundary_condition_to_input_file(
+    input_file, boundary_condition: _BoundaryCondition
+) -> None:
+    """Dump a boundary condition referencing a GeometrySetInputFile to the 4C input
+    file.
+
+    Args:
+        input_file: The 4C input file via FourCIPP where the boundary condition will be dumped to.
+        boundary_condition: The boundary condition to be dumped to the input file. This has to be a plain BoundaryCondition object.
+    """
+    if not isinstance(boundary_condition, _BoundaryCondition):
+        raise TypeError(
+            f"Only `BoundaryConditions` can be added directly to an input file, got `{type(boundary_condition)}`"
+        )
+
+    bc_key = boundary_condition.bc_type
+    geometry_key = boundary_condition.geometry_set.geometry_type
+    if isinstance(bc_key, str):
+        section = bc_key
+    else:
+        section = _INPUT_FILE_MAPPINGS["boundary_conditions"][(bc_key, geometry_key)]
+    input_file.boundary_conditions[section].append(
+        _FourCBoundaryConditionData(
+            geometry_set_id=boundary_condition.geometry_set.get_geometry_set_id(
+                input_file.mesh_representation
+            )
+            + 1,
+            data=input_file.fourc_input.type_converter(boundary_condition.data),
+        )
+    )
+
+
 def dump_mesh_representation_to_input_file_yaml(
     fourc_input: _FourCInput,
     mesh_representation: _MeshRepresentation,
