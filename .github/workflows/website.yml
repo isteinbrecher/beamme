@@ -28,6 +28,7 @@ jobs:
       - name: Install dependencies
         run: |
           # Needed for PyVista to render offscreen
+          sudo apt-get update
           sudo apt-get install -y libosmesa6-dev pandoc xvfb
           pip install -r website/requirements.txt
           pip install -e .[dev]
