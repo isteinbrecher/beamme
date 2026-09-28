@@ -38,7 +38,7 @@ local_scheme = "no-local-version"
 
 [project.optional-dependencies]
 cubitpy = [
-  "cubitpy",
+  "cubitpy>=0.2.2",
   "netCDF4"
 ]
 fourc = ["fourcipp"]
@@ -52,7 +52,7 @@ dev = [
   "pytest",
   "pytest-cov",
   "testbook",
-  "vistools>=0.7.0",
+  "vistools>=0.7.1",
   "xmltodict"
 ]
 
