@@ -194,5 +194,3 @@ create_beam_mesh_from_splinepy(
 )
 
 mesh.display_pyvista()
-
-# %%
