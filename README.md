@@ -165,6 +165,10 @@ Feel free to leave a ⭐️ on [GitHub](https://github.com/beamme-py/beamme).
 
 ### Peer-reviewed articles <!-- omit from toc -->
 
+1. </span><span class="csl-right-inline">Firmbach, M., Steinbrecher, I., Popp, A., Mayr, M. (2027):
+Modified augmented Lagrangian preconditioning for mixed-dimensional beam-solid coupling. Computer Methods in
+Applied Mechanics and Engineering, 463, 119425.
+<https://doi.org/10.1016/j.cma.2026.119425></span>
 1. </span><span class="csl-right-inline">Ranno, A., Manjunatha, K., Koritzius, T., Steinbrecher, I., Hosters, N., Nachtsheim, M., Nilcham, P., Schaaps, N., Turoni-Glitz, A., Datz, J., Popp, A., Linka, K., Vogt, F., and Behr, M. (2025):
 A computational model of coronary arteries with in-stent restenosis coupling hemodynamics and pharmacokinetics with growth mechanics. Scientific Reports, 15, 39229
 <https://doi.org/10.1038/s41598-025-22291-w></span>
