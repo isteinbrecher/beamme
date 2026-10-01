@@ -467,27 +467,6 @@
           0 0 1 1 0 0
           0 0
         </DataArray>
-        <DataArray type="Int64" Name="geometry_set_18_line" format="ascii" RangeMin="1" RangeMax="1">
-          1 1 1 1 1 1
-          1 1 1 1 1 1
-          1 1 1 1 1 1
-          1 1 1 1 1 1
-          1 1 1 1 1 1
-          1 1 1 1 1 1
-          1 1 1 1 1 1
-          1 1 1 1 1 1
-          1 1 1 1 1 1
-          1 1 1 1 1 1
-          1 1 1 1 1 1
-          1 1 1 1 1 1
-          1 1 1 1 1 1
-          1 1 1 1 1 1
-          1 1 1 1 1 1
-          1 1 1 1 1 1
-          1 1 1 1 1 1
-          1 1 1 1 1 1
-          1 1
-        </DataArray>
         <DataArray type="Float64" Name="node_value" format="ascii" RangeMin="0.5" RangeMax="1">
           1 0.5 1 0.5 1 1
           0.5 1 0.5 1 1 0.5

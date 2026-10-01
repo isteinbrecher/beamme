@@ -68,9 +68,27 @@ def assert_results_close(tmp_path, current_test_name) -> Callable:
 
     def _assert_results_close(
         reference: (
-            Path | str | int | float | dict | list | np.ndarray | InputFile | Mesh
+            Path
+            | str
+            | int
+            | float
+            | dict
+            | list
+            | np.ndarray
+            | InputFile
+            | Mesh
+            | None
         ),
-        result: Path | str | int | float | dict | list | np.ndarray | InputFile | Mesh,
+        result: Path
+        | str
+        | int
+        | float
+        | dict
+        | list
+        | np.ndarray
+        | InputFile
+        | Mesh
+        | None,
         rtol: float = RELATIVE_TOLERANCE,
         atol: float = ABSOLUTE_TOLERANCE,
         four_c_input_file_data_format: str = "yaml",
@@ -228,6 +246,9 @@ def convert_to_primitive_type(
         ]
 
     if isinstance(obj, pv.UnstructuredGrid):
+        return obj
+
+    if obj is None:
         return obj
 
     raise TypeError(f"The comparison for {type(obj)} is not yet implemented!")

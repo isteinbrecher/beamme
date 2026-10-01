@@ -42,9 +42,6 @@ from beamme.core.mesh_representation import MeshRepresentation as _MeshRepresent
 from beamme.core.mesh_representation import (
     merge_mesh_representations as _merge_mesh_representations,
 )
-from beamme.core.mesh_representation import (
-    string_to_geometry_set_info as _string_to_geometry_set_info,
-)
 from beamme.core.nurbs_patch import NURBSPatch as _NURBSPatch
 from beamme.core.rotation import Rotation as _Rotation
 from beamme.four_c.boundary_condition_data import (
@@ -64,6 +61,39 @@ from beamme.four_c.material import (
 from beamme.utils.data_structures import (
     create_inverse_mapping as _create_inverse_mapping,
 )
+
+
+def get_geometry_set_infos_with_nodal_flag_vector(
+    mesh_representation: _MeshRepresentation,
+) -> list[_GeometrySetInfo]:
+    """Get list of geometry set infos with nodal flag vectors.
+
+    Args:
+        mesh_representation: The mesh representation from which we want to get the
+            geometry set infos.
+
+    Returns:
+        A list of geometry set infos. If the geometry set is a node-set we return it as
+        is, if it is a cell-set we compute the nodes connected to the cells and add
+        also return this vector.
+    """
+    geometry_set_infos = mesh_representation.get_geometry_set_infos()
+    for info in geometry_set_infos:
+        if info.point_flag_vector is None:
+            unique_values = _np.unique(
+                _np.concatenate(
+                    list(
+                        mesh_representation.connectivity_iterator(
+                            element_indices=_np.flatnonzero(info.cell_flag_vector)
+                        )
+                    )
+                )
+            )
+            point_flag_vector = _np.zeros(mesh_representation.n_points, dtype=int)
+            point_flag_vector[unique_values] = 1
+            info.point_flag_vector = point_flag_vector
+
+    return geometry_set_infos
 
 
 def dump_function(function: _Function, i_global: int) -> dict[str, _Any]:
@@ -191,10 +221,8 @@ def dump_mesh_to_input_file(input_file, mesh: _Mesh) -> None:
         ),
         default=0,
     )
-    for name in input_file.mesh_representation.point_data.keys():
-        info = _string_to_geometry_set_info(name)
-        if info is not None:
-            start_index_geometry_set = max(start_index_geometry_set, info.i_global + 1)
+    for info in input_file.mesh_representation.get_geometry_set_infos():
+        start_index_geometry_set = max(start_index_geometry_set, info.i_global + 1)
 
     # Compute starting index for functions
     start_index_functions = max(
@@ -472,23 +500,27 @@ def dump_mesh_representation_to_input_file_yaml(
     _dump("STRUCTURE ELEMENTS", element_list)
 
     # Dump geometry sets to the input file.
-    # We first create a mapping from the geometry type to a dictionary which maps
-    # the global geometry set ID to the name of the corresponding data array in the
-    # mesh representation. This is required for the sorting later on.
-    geometry_type_to_geometry_sets: dict[_Geometry, dict[int, str]] = _defaultdict(dict)
-    for name in mesh_representation.point_data.keys():
-        info = _string_to_geometry_set_info(name)
-        if info is not None:
-            geometry_type_to_geometry_sets[info.geometry_type][info.i_global] = name
-
-    for geometry_type, id_to_name_map in geometry_type_to_geometry_sets.items():
+    # We first create a mapping from the geometry type to a dictionary which maps the
+    # global geometry set ID to the name of the info object. This is required for the
+    # sorting later on.
+    geometry_set_infos = get_geometry_set_infos_with_nodal_flag_vector(
+        mesh_representation
+    )
+    geometry_type_to_geometry_infos: dict[_Geometry, dict[int, _GeometrySetInfo]] = (
+        _defaultdict(dict)
+    )
+    for geometry_set_info in geometry_set_infos:
+        geometry_type_to_geometry_infos[geometry_set_info.geometry_type][
+            geometry_set_info.i_global
+        ] = geometry_set_info
+    for geometry_type, id_to_info in geometry_type_to_geometry_infos.items():
         geometry_set_list = []
         # We sort the keys here to ensure that the geometry sets are dumped in the
         # correct order.
-        sorted_ids = sorted(id_to_name_map.keys())
+        sorted_ids = sorted(id_to_info.keys())
         for i_global in sorted_ids:
-            name = id_to_name_map[i_global]
-            node_indices = _np.nonzero(mesh_representation.point_data[name])[0]
+            info = id_to_info[i_global]
+            node_indices = _np.nonzero(info.point_flag_vector)[0]
             geometry_set_list.extend(
                 [
                     {
@@ -656,24 +688,25 @@ def dump_mesh_representation_to_input_file_vtu(
         }
     )
 
-    # Add point sets from the mesh representation to the VTU grid.
+    # Add geometry sets from the mesh representation to the VTU grid.
+    geometry_set_infos = get_geometry_set_infos_with_nodal_flag_vector(
+        mesh_representation
+    )
     geometry_sets_in_mr: dict[int, _GeometrySetInfo] = {}
-    for name, values in mesh_representation.point_data.items():
-        geometry_set_info = _string_to_geometry_set_info(name)
-        if geometry_set_info is not None:
-            geometry_set_id = geometry_set_info.i_global
-            geometry_sets_in_mr[geometry_set_id] = geometry_set_info
-            if geometry_set_info.name is not None:
-                data_array_name = geometry_set_info.name
-            else:
-                data_array_name = f"point_set_{geometry_set_id}"
-            if data_array_name in grid.point_data:
-                raise ValueError(
-                    f"Data array name {data_array_name} for geometry set {geometry_set_id} "
-                    "already exists in the VTU grid. Please ensure that the geometry set names "
-                    "in the mesh representation do not conflict with existing data array names."
-                )
-            grid.point_data[data_array_name] = values
+    for geometry_set_info in geometry_set_infos:
+        geometry_set_id = geometry_set_info.i_global
+        geometry_sets_in_mr[geometry_set_id] = geometry_set_info
+        if geometry_set_info.name is not None:
+            data_array_name = geometry_set_info.name
+        else:
+            data_array_name = f"point_set_{geometry_set_id}"
+        if data_array_name in grid.point_data:
+            raise ValueError(
+                f"Data array name {data_array_name} for geometry set {geometry_set_id} "
+                "already exists in the VTU grid. Please ensure that the geometry set names "
+                "in the mesh representation do not conflict with existing data array names."
+            )
+        grid.point_data[data_array_name] = geometry_set_info.point_flag_vector
 
     # Add definition of the boundary conditions (geometry sets defined in the vtu
     # mesh) to the yaml input file.

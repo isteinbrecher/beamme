@@ -326,6 +326,27 @@ class MeshRepresentation:
                 # Add the renamed geometry sets back to the data field.
                 setattr(self, field_type, {**data_field, **new_dict})
 
+    def get_geometry_set_infos(self) -> list[GeometrySetInfo]:
+        """Get a list of all the geometry set info objects contained in this mesh
+        representation.
+
+        Returns:
+            A list of GeometrySetInfo objects. A reference to the internal data is added to the info object.
+        """
+        geometry_sets = []
+        for field_type, flag_vector_name in (
+            ("point_data", "point_flag_vector"),
+            ("cell_data", "cell_flag_vector"),
+        ):
+            data_field = getattr(self, field_type)
+            for name in data_field.keys():
+                info = string_to_geometry_set_info(name)
+                if info is not None:
+                    # Set the flag vector in the info object.
+                    setattr(info, flag_vector_name, data_field[name])
+                    geometry_sets.append(info)
+        return geometry_sets
+
     def get_pyvista_grid(
         self,
         *,

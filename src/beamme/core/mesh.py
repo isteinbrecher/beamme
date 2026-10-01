@@ -886,10 +886,12 @@ class Mesh:
         geometry_sets = []
         for geometry_type, geometry_list in mesh_sets.items():
             for geometry_set in geometry_list:
-                node_set_flag = _np.zeros(n_nodes, dtype=int)
-                node_set_flag[
-                    [node.i_global for node in geometry_set.get_all_nodes()]
-                ] = 1
+                geometry_set_info = _GeometrySetInfo(
+                    geometry_type=geometry_type,
+                    i_global=geometry_sets_to_i_global[geometry_set],
+                    name=geometry_set.name,
+                )
+
                 if isinstance(geometry_set, _GeometrySet) and (
                     geometry_type == _bme.geo.line
                     or geometry_type == _bme.geo.surface
@@ -910,17 +912,16 @@ class Mesh:
                         else:
                             element_set_indices.append(_cast(int, element.i_global))
                     element_set_flag[element_set_indices] = 1
+                    geometry_set_info.cell_flag_vector = element_set_flag
 
                 else:
-                    element_set_flag = None
-                geometry_set_wrapper = _GeometrySetInfo(
-                    geometry_type=geometry_type,
-                    i_global=geometry_sets_to_i_global[geometry_set],
-                    point_flag_vector=node_set_flag,
-                    cell_flag_vector=element_set_flag,
-                    name=geometry_set.name,
-                )
-                geometry_sets.append(geometry_set_wrapper)
+                    node_set_flag = _np.zeros(n_nodes, dtype=int)
+                    node_set_flag[
+                        [node.i_global for node in geometry_set.get_all_nodes()]
+                    ] = 1
+                    geometry_set_info.point_flag_vector = node_set_flag
+
+                geometry_sets.append(geometry_set_info)
 
         # Reset the previously set indices.
         for node in self.nodes:
