@@ -1136,9 +1136,12 @@ class Mesh:
                 for i, arrow in enumerate(directors):
                     plotter.add_mesh(arrow, color=colors[i])
 
-        solid_mask = grid.cell_data["beamme_type"] == _bme.element_type.solid.value
-        if _np.any(solid_mask):
-            solid_grid = grid.extract_cells(solid_mask)
+        mask_solid_or_space_time = _np.isin(
+            grid.cell_data["beamme_type"],
+            [_bme.element_type.solid.value, _bme.element_type.space_time_beam.value],
+        )
+        if _np.any(mask_solid_or_space_time):
+            solid_grid = grid.extract_cells(mask_solid_or_space_time)
             plotter.add_mesh(solid_grid, color="white", show_edges=True, opacity=0.5)
 
         if not _is_testing():
