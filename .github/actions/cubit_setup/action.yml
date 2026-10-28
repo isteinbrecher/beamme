@@ -47,6 +47,18 @@ runs:
         CUBIT_FOLDER=$(find . -maxdepth 1 -type d -name "Coreform-Cubit-*" | head -n 1 | sed 's|^\./||')
         CUBIT_ROOT="$(pwd)/$CUBIT_FOLDER"
         echo "cubit_root=$CUBIT_ROOT" >> "$GITHUB_OUTPUT"
+
+        # Work around libCATSysTS.so requiring an executable stack:
+        # https://forum.coreform.com/t/coreform-cubit-2025-8-on-fedora-core-42/2617
+        # The forum suggests execstack; we use patchelf because it is actively maintained
+        # and provides the equivalent --clear-execstack operation.
+        sudo apt install -y patchelf
+        find "$CUBIT_ROOT" -type f -name 'libCATSysTS.so' -print0 |
+            while IFS= read -r -d '' lib; do
+                echo "Clearing executable stack flag on $lib"
+                patchelf --clear-execstack "$lib"
+            done
+
         # Activate cubit. Retry login until success or timeout.
         timeout="${{ inputs.cubit_activation_timeout }}"
         delay="${{ inputs.cubit_activation_delay_between_retries }}"
